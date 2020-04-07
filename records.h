@@ -45,3 +45,33 @@
     (LEN) = _len;                                                       \
   }
 
+/*
+ * Iterators for keeping state between function calls. Intended for 
+ * when reports need to be distributed over several messages.  
+ */
+#define ITERVAR(I) void *(I)
+
+#define ITERSTART(I) {        \
+      if ((I) !=  NULL)       \
+         goto *(I);           \
+     }   
+
+#define ITERSTEP(I) {                     \
+     __label__ _iterlabel;                \
+     (I) = && _iterlabel;                 \
+     _iterlabel: {}                       \
+  }
+     
+#define ITERSTOP(I) (I) = NULL 
+
+#define ITERMORE(I) ((I) != NULL)
+
+#define ITERCALL(F, N) {                        \
+   int _n;                                      \
+   _n = (F);                                    \
+   if (_n == 0)                                 \
+      return (N);                               \
+   else                                         \
+      (N) += _n;                                \
+   }
+
