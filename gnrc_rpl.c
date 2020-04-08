@@ -171,30 +171,51 @@ static int parents(char *str, size_t len) {
 
 }
 
-int rpl_report(uint8_t *buf, size_t len) {
-     char *str = (char *) buf;
-     int n = 0;
-     static ITERVAR(iter) = NULL;
+int rpl_report(uint8_t *buf, size_t len, ITERVAR(*iter)) {
+     char *s = (char *) buf;
+     size_t l = len;
+     int n;
      
-     ITERSTART(iter);
+     ITERSTART(*iter);
 
-     ITERSTEP(iter);
-     ITERCALL(instances(str + n, len - n), n);
+     ITERSTEP(*iter);
+     n = instances(s, l);
+     if (n == 0)
+       return (len - l);
+     else {
+       s += n; l -= n;
+     }
 
-     ITERSTEP(iter);
-     ITERCALL(dags(str + n, len - n), n);
+     ITERSTEP(*iter);
+     n = dags(s, l);
+     if (n == 0)
+       return (len - l);
+     else {
+       s += n; l -= n;
+     }
 
-     ITERSTEP(iter);
-     ITERCALL(parents(str + n, len - n), n);
+     ITERSTEP(*iter);
+     n = parents(s, l);
+     if (n == 0)
+       return (len - l);
+     else {
+       s += n; l -= n;
+     }
+
 
 #ifdef MODULE_NETSTATS_RPL
-     ITERSTEP(iter);
+     ITERSTEP(*iter);
      static ITERVAR(statsiter) = NULL;
      do {
-          ITERCALL(stats(str + n, len - n, &statsiter), n);
+       n = stats(s, l, &statsiter);
+       if (n == 0)
+         return (len - l);
+       else {
+         s += n; l -= n;
+       }
      } while (ITERMORE(statsiter));
 #endif
 
-     ITERSTOP(iter);
+     ITERSTOP(*iter);
      return n;
 }

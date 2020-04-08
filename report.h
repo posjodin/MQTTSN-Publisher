@@ -4,8 +4,8 @@
  * in a report, ie to represent a senml element
  */
 
-#define WARN printf
-//#define WARN()
+//#define WARN printf
+#define WARN()
 
 /*
  * Mark start of a record. 
@@ -19,6 +19,10 @@
 /*
  * Attempt to write print formatted text to a record
  */
+#define RAWPUTFMT(S, N, ...) {                                          \
+      _n = snprintf(_str, _len, __VA_ARGS__);                           \
+      assert(_n < (L))
+
 #define PUTFMT(...) {                                                   \
       _n = snprintf(_str, _len, __VA_ARGS__);                           \
       if (_n < _len) {                                                  \
@@ -45,6 +49,25 @@
     (LEN) = _len;                                                       \
   }
 
+/*
+ * For calling external functions to place data in buffer:
+ *
+ * - Get current buffer pointer and len
+ */
+#define REC_STR (_str)
+#define REC_LEN (_len)
+/*
+ * - Advance buffer pointer and reduce len by N
+ */
+#define REC_ADD(N)                                                      \
+   if ((N) < _len) {                                                    \
+      _str += (N);                                                      \
+      _len -= (N);                                                      \
+   }                                                                    \
+   else {                                                               \
+      goto _full;                                                       \
+   }                                                                    \
+   
 /*
  * Iterators for keeping state between function calls. Intended for 
  * when reports need to be distributed over several messages.  
@@ -74,4 +97,10 @@
    else                                         \
       (N) += _n;                                \
    }
+
+
+int rpl_report(uint8_t *buf, size_t len, ITERVAR(*iter));
+int mqttsn_report(uint8_t *buf, size_t len, ITERVAR(*iter));
+
+typedef int (* report_gen_t)(uint8_t *buf, size_t len, ITERVAR(*iter));
 
