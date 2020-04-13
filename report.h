@@ -5,48 +5,44 @@
  */
 
 //#define WARN printf
-#define WARN()
+#define WARN(...)
 
+   
 /*
  * Mark start of a record. 
- * Save current state (string pointer and length).
+ * Save current state as starting state (string pointer and length).
  */
-#define STARTRECORD(STR, LEN) {                                         \
+#define RECORD_START(STR, LEN) {                                        \
    __label__ _full, _notfull;                                           \
    char *_str = (STR);                                                  \
-   size_t _len = (LEN), _n;                                             \
+   size_t _len = (LEN), _nread = 0;                                     \
 
 /*
- * Attempt to write print formatted text to a record
+ * Attempt to write printf-formatted text to a record
  */
-#define RAWPUTFMT(S, N, ...) {                                          \
-      _n = snprintf(_str, _len, __VA_ARGS__);                           \
-      assert(_n < (L))
 
 #define PUTFMT(...) {                                                   \
-      _n = snprintf(_str, _len, __VA_ARGS__);                           \
-      if (_n < _len) {                                                  \
-         _str += _n;                                                    \
-         _len -= _n;                                                    \
-      }                                                                 \
-      else {                                                            \
+    size_t _n = snprintf(_str + _nread, _len - _nread, __VA_ARGS__);    \
+    if (_n < _len - _nread) {                                           \
+        _nread += _n;                                                   \
+    }                                                                   \
+    else {                                                              \
          goto _full;                                                    \
-      }                                                                 \
-   }
+    }                                                                   \
+  }
 
 /*
  * End of record -- commit if succeeded, else abort and revert to
- * saved state.
+ * starting state.
  */
-#define ENDRECORD(STR, LEN, ORIGLEN)                                    \
+#define RECORD_END(NREAD)                                               \
    goto _notfull;                                                       \
   _full:                                                                \
     WARN("%s: %d: no space left\n", __FILE__, __LINE__);                \
-    *(STR) = '\0';                                                      \
-    return ((ORIGLEN)-(LEN));                                           \
+    *(_str) = '\0';                                                     \
+    return ((NREAD));                                                   \
   _notfull:                                                             \
-    (STR) = _str;                                                       \
-    (LEN) = _len;                                                       \
+  (NREAD) += _nread;                                                    \
   }
 
 /*
@@ -54,53 +50,22 @@
  *
  * - Get current buffer pointer and len
  */
-#define REC_STR (_str)
-#define REC_LEN (_len)
+#define RECORD_STR() (_str + _nread)
+#define RECORD_LEN() (_len - _nread)
 /*
- * - Advance buffer pointer and reduce len by N
+ * - Advance bytes written to buffer by N
  */
-#define REC_ADD(N)                                                      \
-   if ((N) < _len) {                                                    \
-      _str += (N);                                                      \
-      _len -= (N);                                                      \
+#define RECORD_ADD(N)                                                     \
+  if ((N) < _len - _nread) {                                            \
+      _nread += (N);                                                    \
    }                                                                    \
    else {                                                               \
       goto _full;                                                       \
    }                                                                    \
    
-/*
- * Iterators for keeping state between function calls. Intended for 
- * when reports need to be distributed over several messages.  
- */
-#define ITERVAR(I) void *(I)
 
-#define ITERSTART(I) {        \
-      if ((I) !=  NULL)       \
-         goto *(I);           \
-     }   
+int rpl_report(uint8_t *buf, size_t len, uint8_t *finished);
+int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished);
 
-#define ITERSTEP(I) {                     \
-     __label__ _iterlabel;                \
-     (I) = && _iterlabel;                 \
-     _iterlabel: {}                       \
-  }
-     
-#define ITERSTOP(I) (I) = NULL 
-
-#define ITERMORE(I) ((I) != NULL)
-
-#define ITERCALL(F, N) {                        \
-   int _n;                                      \
-   _n = (F);                                    \
-   if (_n == 0)                                 \
-      return (N);                               \
-   else                                         \
-      (N) += _n;                                \
-   }
-
-
-int rpl_report(uint8_t *buf, size_t len, ITERVAR(*iter));
-int mqttsn_report(uint8_t *buf, size_t len, ITERVAR(*iter));
-
-typedef int (* report_gen_t)(uint8_t *buf, size_t len, ITERVAR(*iter));
+typedef int (* report_gen_t)(uint8_t *buf, size_t len, uint8_t *finished);
 

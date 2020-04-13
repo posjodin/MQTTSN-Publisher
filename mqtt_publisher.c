@@ -31,7 +31,7 @@
 #include "at24mac.h"
 
 #include "mqtt_publisher.h"
-#include "records.h"
+#include "report.h"
 
 #define MQPUB_PRIO         (THREAD_PRIORITY_MAIN - 1)
 
@@ -113,11 +113,10 @@ static int mqpub_pub(void) {
 static int mqpub_con(void) {
     sock_udp_ep_t gw = { .family = AF_INET6, .port = MQTTSN_GATEWAY_PORT };
     int errno;
-    printf("Conneect\n");
 
     /* parse address */
     if (ipv6_addr_from_str((ipv6_addr_t *)&gw.addr.ipv6, MQTTSN_GATEWAY_HOST) == NULL) {
-        printf("error parsing IPv6 address\n");
+         printf("Bad address %s\n", MQTTSN_GATEWAY_HOST);
         return 1;
     }
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
@@ -125,7 +124,7 @@ static int mqpub_con(void) {
         mqttsn_stats.connect_fail += 1;
         return 1;
     }
-    printf("Successfully connected to gateway [%s]:%d\n", MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+    printf("MQTT-SN: Connect to gateway [%s]:%d\n", MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
     mqttsn_stats.connect_ok += 1;
     return 0;
 }
@@ -138,7 +137,7 @@ static int mqpub_reg(void) {
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", topicstr, errno);
         return 1;
     }
-    printf("Obtained topic ID %d for \"%s\"\n", (int)emcute_topic.id, topicstr);
+    printf("Register topic %d for \"%s\"\n", (int)emcute_topic.id, topicstr);
     mqttsn_stats.register_ok += 1;
     return 0;
 }
@@ -150,7 +149,6 @@ static void *mqpub_thread(void *arg)
     uint32_t sleepsecs;
     (void)arg;
     
-    printf("Here is mqtt_publisher thread\n");
  again:
     state = MQTTSN_NOT_CONNECTED;
     sleepsecs = MQPUB_STATE_INTERVAL;
@@ -173,12 +171,11 @@ static void *mqpub_thread(void *arg)
         sleepsecs = MQTTSN_PUBLISH_INTERVAL;
         break;
       default:
-        printf("Do nothin in state %d\n", state);
         break;
       }
       xtimer_sleep(sleepsecs);
     }
-    return NULL;    /* should never be reached */
+    return NULL;    /* shouldn't happen */
 }
 
 void mqtt_publisher_init(void) {
@@ -188,43 +185,53 @@ void mqtt_publisher_init(void) {
                   mqpub_thread, NULL, "emcute");
 }
 
-int mqttsn_report(uint8_t *buf, size_t len, ITERVAR(*iter)) {
+typedef enum {s_gateway, s_connect, s_register, s_publish} mqttsn_report_state_t;
+
+int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished) {
      char *s = (char *) buf;
      size_t l = len;
+     static mqttsn_report_state_t state = s_gateway;
+     int nread = 0;
      
-     ITERSTART(*iter);
+     *finished = 0;
+     
+     switch (state) {
+     case s_gateway:
+          RECORD_START(s + nread, l - nread);
+          PUTFMT(",{\"n\": \"mqtt_sn;gateway\",\"vs\":\"[%s]:%d\"}",MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+          RECORD_END(nread);
+          state = s_connect;
 
-     ITERSTEP(*iter);
-     STARTRECORD(s, l);
-     PUTFMT(",{\"n\": \"mqtt_sn;gateway\",\"vs\":\"[%s]:%d\"}",MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
-     ENDRECORD(s, l, len);
-          
-     STARTRECORD(s, l);
-     PUTFMT(",{\"n\":\"mqtt_sn;stats;connect\",\"vj\":[");
-     PUTFMT("{\"n\":\"ok\",\"u\":\"count\",\"v\":%d},", mqttsn_stats.connect_ok);
-     PUTFMT("{\"n\":\"fail\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.connect_fail);
-     PUTFMT("]}");
-     ENDRECORD(s, l, len);
+     case s_connect:
+          RECORD_START(s + nread, l - nread);
+          PUTFMT(",{\"n\":\"mqtt_sn;stats;connect\",\"vj\":[");
+          PUTFMT("{\"n\":\"ok\",\"u\":\"count\",\"v\":%d},", mqttsn_stats.connect_ok);
+          PUTFMT("{\"n\":\"fail\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.connect_fail);
+          PUTFMT("]}");
+          RECORD_END(nread);
+          state = s_register;
 
+     case s_register:
+          RECORD_START(s + nread, l - nread);
+          PUTFMT(",{\"n\":\"mqtt_sn;stats;register\",\"vj\":[");
+          PUTFMT("{\"n\":\"ok\",\"u\":\"count\",\"v\":%d},", mqttsn_stats.register_ok);
+          PUTFMT("{\"n\":\"fail\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.register_fail);
+          PUTFMT("]}");
+          RECORD_END(nread);
+          state = s_publish;
+     
+     case s_publish:
+          RECORD_START(s + nread, l - nread);
+          PUTFMT(",{\"n\":\"mqtt_sn;stats;publish\",\"vj\":[");
+          PUTFMT("{\"n\":\"ok\",\"u\":\"count\",\"v\":%d},", mqttsn_stats.publish_ok);
+          PUTFMT("{\"n\":\"fail\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.publish_fail);
+          PUTFMT("]}");
+          RECORD_END(nread);
 
-     ITERSTEP(*iter);
-     STARTRECORD(s, l);
-     PUTFMT(",{\"n\":\"mqtt_sn;stats;register\",\"vj\":[");
-     PUTFMT("{\"n\":\"ok\",\"u\":\"count\",\"v\":%d},", mqttsn_stats.register_ok);
-     PUTFMT("{\"n\":\"fail\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.register_fail);
-     PUTFMT("]}");
-     ENDRECORD(s, l, len);
+          state = s_gateway;
+     }
+     *finished = 1;
 
-     ITERSTEP(*iter);
-     STARTRECORD(s, l);
-     PUTFMT(",{\"n\":\"mqtt_sn;stats;publish\",\"vj\":[");
-     PUTFMT("{\"n\":\"ok\",\"u\":\"count\",\"v\":%d},", mqttsn_stats.publish_ok);
-     PUTFMT("{\"n\":\"fail\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.publish_fail);
-     PUTFMT("]}");
-     ENDRECORD(s, l, len);
-
-     ITERSTOP(*iter);
-
-     return len-l;
+     return nread;
 }
 
