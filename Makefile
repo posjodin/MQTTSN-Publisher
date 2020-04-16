@@ -51,24 +51,16 @@ DEVELHELP ?= 1
 # DODAG Configuration Options (see the doc for more info)
 # CFLAGS += -DGNRC_RPL_DODAG_CONF_OPTIONAL_ON_JOIN
 
+# Override I2C defaults for lower speed
+CFLAGS += -DI2C_NUMOF=1U -DI2C_BUS_SPEED=I2C_SPEED_NORMAL
+
 # Change this to 0 show compiler invocation lines by default:
 QUIET ?= 1
 
 include $(RIOTBASE)/Makefile.include
 
-# Set a custom channel if needed
+# Set a custom channel 
 # For KTH Contiki gateway
-#
-# ifconfig 7 add unicast fd02::3c8b:2185:3d8b:2184/64
-# ifconfig 7 add unicast fd02::3c8b:2185:3d8b:9999/64
-# ping6 64:ff9b::c010:7dea -- gridgw.ssvl.kth.se
-# usage: udp send <addr> <port> <data> [<num> [<delay in us>]]
-# gridgw.ssvl.kth.se:
-# udp send 64:ff9b::c010:7dea 8888 hejhopp
-# udp send 64:ff9b::82ed:ca25 8888 hejhopp
-# con 64:ff9b::c0a8:0196 10000
-#
-# pub KTH/avr-rss2/fcc23d00000007ce/sensors [{"bn": "urn:dev:mac:fcc23d00000007ce;", "bt": 4711},{"n": "hello", "vs": "hello from RIOT" }]
 #
 DEFAULT_CHANNEL=25
 DEFAULT_PAN_ID=0xFEED

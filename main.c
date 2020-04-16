@@ -16,12 +16,6 @@
 
 #include "mqttsn_publisher.h"
 
-#ifndef EMCUTE_ID
-#define EMCUTE_ID           ("avr-rss2")
-#endif
-#define EMCUTE_PORT         (1883U)
-#define EMCUTE_PRIO         (THREAD_PRIORITY_MAIN - 1)
-
 static int cmd_hello(int argc, char **argv)
 {
     (void)argc;
