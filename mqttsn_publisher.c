@@ -20,6 +20,12 @@
 #include "mqttsn_publisher.h"
 #include "report.h"
 
+#ifndef EMCUTE_ID
+#define EMCUTE_ID           ("avr-rss2")
+#endif
+#define EMCUTE_PORT         (1883U)
+#define EMCUTE_PRIO         (THREAD_PRIORITY_MAIN - 1)
+
 #define MQPUB_PRIO         (THREAD_PRIORITY_MAIN - 1)
 
 #define NUMOFSUBS           (16U)
@@ -47,12 +53,20 @@ typedef struct mqttsn_stats {
 
 mqttsn_stats_t mqttsn_stats;
 
-static char stack[THREAD_STACKSIZE_DEFAULT];
+static char mqpub_stack[THREAD_STACKSIZE_DEFAULT];
+static char emcute_stack[THREAD_STACKSIZE_DEFAULT];
 
 static char topicstr[MQPUB_TOPIC_LENGTH];
 emcute_topic_t emcute_topic;
 
- int get_nodeid(char *buf, size_t size) {
+static void *emcute_thread(void *arg)
+{
+    (void)arg;
+    emcute_run(EMCUTE_PORT, EMCUTE_ID);
+    return NULL;    /* should never be reached */
+}
+
+int get_nodeid(char *buf, size_t size) {
     int n = 0;
     eui64_t e64;
 
@@ -166,10 +180,15 @@ static void *mqpub_thread(void *arg)
 }
 
 void mqttsn_publisher_init(void) {
+
     _init_topic();
+
+    /* start emcute thread */
+    thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, 0,
+                  emcute_thread, NULL, "emcute");
     /* start publisher thread */
-    thread_create(stack, sizeof(stack), MQPUB_PRIO, 0,
-                  mqpub_thread, NULL, "emcute");
+    thread_create(mqpub_stack, sizeof(mqpub_stack), MQPUB_PRIO, 0,
+                  mqpub_thread, NULL, "mqttsn_publisher");
 }
 
 typedef enum {s_gateway, s_connect, s_register, s_publish} mqttsn_report_state_t;
