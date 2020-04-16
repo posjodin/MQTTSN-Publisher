@@ -1,5 +1,5 @@
 # name of your application
-APPLICATION = mqtt_publisher
+APPLICATION = mqttsn_publisher
 
 # If no BOARD is found in the environment, use this default:
 BOARD ?= avr-rss2

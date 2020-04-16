@@ -1,3 +1,11 @@
+/*
+ * Copyright (C) 2020 Peter Sjödin, KTH
+ *
+ * This file is subject to the terms and conditions of the GNU Lesser
+ * General Public License v2.1. See the file LICENSE in the top level
+ * directory for more details.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -6,10 +14,14 @@
 #include "net/ipv6/addr.h"
 #include "xtimer.h"
 
-#include "mqtt_publisher.h"
+#include "mqttsn_publisher.h"
 #include "report.h"
 
 static int seq_nr_value = 0;
+
+int rpl_report(uint8_t *buf, size_t len, uint8_t *finished);
+int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished);
+int boot_report(uint8_t *buf, size_t len, uint8_t *finished);
 
 static size_t preamble(uint8_t *buf, size_t len) {
      char *s = (char *) buf;
@@ -36,7 +48,12 @@ static size_t preamble(uint8_t *buf, size_t len) {
 typedef enum {s_rpl_report, s_mqttsn_report} report_state_t;
 
 report_gen_t next_report_gen(void) {
+     static unsigned int reportno = 0;
      static report_state_t state = s_rpl_report;
+
+     reportno += 1;
+     if (reportno == 1)
+       return(boot_report);
 
      switch (state) {
      case s_rpl_report:
@@ -50,7 +67,7 @@ report_gen_t next_report_gen(void) {
 }
 
 /*
- * Records -- write records to buffer 
+ * Reports -- build report by writing records to buffer 
  */
 static size_t reports(uint8_t *buf, size_t len) {
      char *s = (char *) buf;

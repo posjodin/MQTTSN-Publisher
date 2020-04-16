@@ -1,22 +1,9 @@
 /*
- * Copyright (C) 2015 Freie Universität Berlin
+ * Copyright (C) 2020 Peter Sjödin, KTH
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
  * directory for more details.
- */
-
-/**
- * @ingroup     examples
- * @{
- *
- * @file
- * @brief       Example application for demonstrating RIOT's MQTT-SN library
- *              emCute
- *
- * @author      Hauke Petersen <hauke.petersen@fu-berlin.de>
- *
- * @}
  */
 
 #include <stdio.h>
@@ -30,7 +17,7 @@
 
 #include "at24mac.h"
 
-#include "mqtt_publisher.h"
+#include "mqttsn_publisher.h"
 #include "report.h"
 
 #define MQPUB_PRIO         (THREAD_PRIORITY_MAIN - 1)
@@ -86,14 +73,14 @@ static void _init_topic(void) {
 
     n = snprintf(topicstr, sizeof(topicstr), "%s/", MQTT_TOPIC_BASE);
     n += get_nodeid(topicstr + n, sizeof(topicstr) - n);
-    n += snprintf(topicstr + n, sizeof(topicstr) - n, "/sensor");
+    n += snprintf(topicstr + n, sizeof(topicstr) - n, "/sensors");
 }
 
 
 uint8_t publish_buffer[MQTTSN_BUFFER_SIZE];
 
 static int mqpub_pub(void) {
-    unsigned flags = EMCUTE_QOS_0;
+    unsigned flags = EMCUTE_QOS_1;
     size_t publen;
     int errno;
     
@@ -178,7 +165,7 @@ static void *mqpub_thread(void *arg)
     return NULL;    /* shouldn't happen */
 }
 
-void mqtt_publisher_init(void) {
+void mqttsn_publisher_init(void) {
     _init_topic();
     /* start publisher thread */
     thread_create(stack, sizeof(stack), MQPUB_PRIO, 0,

@@ -1,7 +1,7 @@
-#ifndef MQTT_PUBLISHER_T
-#define MQTT_PUBLISHER_T
+#ifndef MQTTSN_PUBLISHER_T
+#define MQTTSN_PUBLISHER_T
 
-void mqtt_publisher_init(void);
+void mqttsn_publisher_init(void);
 
 #ifndef MQTT_TOPIC_BASE
 #define MQTT_TOPIC_BASE "KTH/avr-rss2"
@@ -24,8 +24,9 @@ void mqtt_publisher_init(void);
 #ifndef MQTTSN_PUBLISH_INTERVAL
 #define MQTTSN_PUBLISH_INTERVAL 30
 #endif /* MQTTSN_PUBLISH_INTERVAL */
-#endif /* MQTT_PUBLISHER_T */
 
 int get_nodeid(char *buf, size_t size);
 
 size_t makereport(uint8_t *buffer, size_t len);
+
+#endif /* MQTTSN_PUBLISHER_T */

@@ -28,7 +28,7 @@
 #include "net/emcute.h"
 #include "net/ipv6/addr.h"
 
-#include "mqtt_publisher.h"
+#include "mqttsn_publisher.h"
 
 #ifndef EMCUTE_ID
 #define EMCUTE_ID           ("avr-rss2")
@@ -75,7 +75,7 @@ int main(void)
     thread_create(stack, sizeof(stack), EMCUTE_PRIO, 0,
                   emcute_thread, NULL, "emcute");
 
-    mqtt_publisher_init();
+    mqttsn_publisher_init();
     /* start shell */
     char line_buf[SHELL_DEFAULT_BUFSIZE];
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
