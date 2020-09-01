@@ -30,10 +30,13 @@ static const shell_command_t shell_commands[] = {
     { NULL, NULL, NULL }
 };
 
+#define MAIN_QUEUE_SIZE     (8)
+static msg_t _main_msg_queue[MAIN_QUEUE_SIZE];
+
 int main(void)
 {
     ///* the main thread needs a msg queue to be able to run `ping6`*/
-    //msg_init_queue(queue, ARRAY_SIZE(queue));
+    msg_init_queue(_main_msg_queue, ARRAY_SIZE(_main_msg_queue));
 
     mqttsn_publisher_init();
     /* start shell */
