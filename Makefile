@@ -23,7 +23,7 @@ USEMODULE += auto_init_gnrc_rpl
 # This application dumps received packets to STDIO using the pktdump module
 #USEMODULE += gnrc_pktdump
 # Additional networking modules that can be dropped if not needed
-#USEMODULE += gnrc_icmpv6_echo
+USEMODULE += gnrc_icmpv6_echo
 # Add also the shell, some shell commands
 USEMODULE += shell
 USEMODULE += shell_commands
@@ -50,6 +50,9 @@ DEVELHELP ?= 1
 # Uncomment this to join RPL DODAGs even if DIOs do not contain
 # DODAG Configuration Options (see the doc for more info)
 # CFLAGS += -DGNRC_RPL_DODAG_CONF_OPTIONAL_ON_JOIN
+
+# For RPL auto initialization
+CFLAGS += -DGNRC_RPL_DEFAULT_NETIF=6
 
 # Override I2C defaults for lower speed
 CFLAGS += -DI2C_NUMOF=1U -DI2C_BUS_SPEED=I2C_SPEED_NORMAL
