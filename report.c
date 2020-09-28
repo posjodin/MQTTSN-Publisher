@@ -19,7 +19,9 @@
 
 static int seq_nr_value = 0;
 
+#if defined(MODULE_GNRC_RPL)
 int rpl_report(uint8_t *buf, size_t len, uint8_t *finished);
+#endif
 int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished);
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished);
 
@@ -45,23 +47,29 @@ static size_t preamble(uint8_t *buf, size_t len) {
  * Report scheduler -- return report generator function to use next
  */
 
-typedef enum {s_rpl_report, s_mqttsn_report} report_state_t;
+typedef enum {
+#if defined(MODULE_GNRC_RPL)
+  s_rpl_report,
+#endif
+  s_mqttsn_report,
+  s_max_report
+} report_state_t;
 
 report_gen_t next_report_gen(void) {
      static unsigned int reportno = 0;
-     static report_state_t state = s_rpl_report;
 
-     reportno += 1;
-     if (reportno == 1)
+     if (reportno++ == 0)
        return(boot_report);
 
-     switch (state) {
+     switch (reportno % s_max_report) {
+#if defined(MODULE_GNRC_RPL)
      case s_rpl_report:
-          state = s_mqttsn_report;
           return(rpl_report);
+#endif
      case s_mqttsn_report:
-          state = s_rpl_report;
           return(mqttsn_report);
+     default:
+         printf("Bad report no %d\n", reportno);
      }
      return NULL;
 }

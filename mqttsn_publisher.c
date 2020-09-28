@@ -14,6 +14,7 @@
 #include "msg.h"
 #include "net/emcute.h"
 #include "net/ipv6/addr.h"
+#include "xtimer.h"
 
 #include "at24mac.h"
 
@@ -21,7 +22,7 @@
 #include "report.h"
 
 #ifndef EMCUTE_ID
-#define EMCUTE_ID           ("avr-rss2")
+#define EMCUTE_ID           ("sim7020-14b0")
 #endif
 #define EMCUTE_PORT         (1883U)
 #define EMCUTE_PRIO         (THREAD_PRIORITY_MAIN - 1)
@@ -49,6 +50,7 @@ typedef struct mqttsn_stats {
   uint16_t connect_fail;
   uint16_t register_fail;
   uint16_t publish_fail;
+  uint16_t reset;
 } mqttsn_stats_t;
 
 mqttsn_stats_t mqttsn_stats;
@@ -88,6 +90,7 @@ static void _init_topic(void) {
     n = snprintf(topicstr, sizeof(topicstr), "%s/", MQTT_TOPIC_BASE);
     n += get_nodeid(topicstr + n, sizeof(topicstr) - n);
     n += snprintf(topicstr + n, sizeof(topicstr) - n, "/sensors");
+    printf("_init topicstr is %s\n", topicstr);
 }
 
 
@@ -106,6 +109,7 @@ static int mqpub_pub(void) {
         mqttsn_stats.publish_fail += 1;
         if (errno == EMCUTE_OVERFLOW)
              return 0;
+        return errno;
     }
     mqttsn_stats.publish_ok += 1;
     return 0;
@@ -131,7 +135,7 @@ static int mqpub_con(void) {
 }
 
 static int mqpub_reg(void) {
-     int errno;
+    int errno;
     emcute_topic.name = topicstr;
     if ((errno = emcute_reg(&emcute_topic)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
@@ -140,6 +144,16 @@ static int mqpub_reg(void) {
     }
     printf("Register topic %d for \"%s\"\n", (int)emcute_topic.id, topicstr);
     mqttsn_stats.register_ok += 1;
+    return 0;
+}
+
+static int mqpub_reset(void) {
+    int errno = emcute_discon();
+    mqttsn_stats.reset += 1;
+    if (errno != EMCUTE_OK) {
+        printf("MQTT-SN: disconnect failed %d\n", errno);
+        return errno;
+    }
     return 0;
 }
 
@@ -163,9 +177,14 @@ static void *mqpub_thread(void *arg)
         if (mqpub_reg() == 0) {
           state = MQTTSN_PUBLISHING;
         }
+        else {
+          mqpub_reset();
+          state = MQTTSN_NOT_CONNECTED;
+        }
         break;
       case MQTTSN_PUBLISHING:
         if (mqpub_pub() != 0) {
+          mqpub_reset();
           state = MQTTSN_NOT_CONNECTED;
           goto again;
         }
@@ -191,7 +210,8 @@ void mqttsn_publisher_init(void) {
                   mqpub_thread, NULL, "mqttsn_publisher");
 }
 
-typedef enum {s_gateway, s_connect, s_register, s_publish} mqttsn_report_state_t;
+typedef enum {
+    s_gateway, s_connect, s_register, s_publish, s_reset} mqttsn_report_state_t;
 
 int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished) {
      char *s = (char *) buf;
@@ -232,6 +252,12 @@ int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished) {
           PUTFMT("{\"n\":\"ok\",\"u\":\"count\",\"v\":%d},", mqttsn_stats.publish_ok);
           PUTFMT("{\"n\":\"fail\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.publish_fail);
           PUTFMT("]}");
+          RECORD_END(nread);
+          state = s_reset;
+          
+     case s_reset:
+          RECORD_START(s + nread, l - nread);
+          PUTFMT(",{\"n\":\"mqtt_sn;stats;reset\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.reset);
           RECORD_END(nread);
 
           state = s_gateway;
