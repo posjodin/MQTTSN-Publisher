@@ -39,6 +39,7 @@ else ifeq ($(NETSTACK), gnrc)
   USEMODULE += gnrc_icmpv6_echo
 
 endif
+USEMODULE += sock_dns
 USEMODULE += core_mbox
 # Add also the shell, some shell commands
 USEMODULE += shell
@@ -52,6 +53,8 @@ endif
 USEMODULE += emcute
 USEMODULE += xtimer
 USEMODULE += at24mac
+
+CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
 # Comment this out to disable code in RIOT that does safety checking
 # which is not needed in a production environment but helps in the

@@ -55,8 +55,8 @@ typedef struct mqttsn_stats {
 
 mqttsn_stats_t mqttsn_stats;
 
-static char mqpub_stack[THREAD_STACKSIZE_DEFAULT];
-static char emcute_stack[THREAD_STACKSIZE_DEFAULT];
+static char mqpub_stack[8*THREAD_STACKSIZE_DEFAULT];
+static char emcute_stack[8*THREAD_STACKSIZE_DEFAULT];
 
 static char topicstr[MQPUB_TOPIC_LENGTH];
 emcute_topic_t emcute_topic;
@@ -115,15 +115,44 @@ static int mqpub_pub(void) {
     return 0;
     
 }
+#include "net/sock/dns.h"
+    char *resolver = "::ffff:0808:0808";
+static sock_udp_ep_t *_resolve_gateway_ep(void) {
+
+    sock_dns_server.family = AF_INET6;
+    sock_dns_server.port = 53;    
+    if (ipv6_addr_from_str((ipv6_addr_t *)&sock_dns_server.addr.ipv6, resolver) == NULL) {
+         printf("Bad resolver address %s\n", resolver);
+        return NULL;
+    }
+
+    static uint8_t addr[32];
+    printf("QUERY resolver ");
+    ipv6_addr_print((ipv6_addr_t *) &sock_dns_server.addr.ipv6);
+    printf("\n");    
+    int res= sock_dns_query("www.kth.se", addr, AF_INET);
+    printf("sock_dns_query -> %d ", res);
+    int i;
+    if (res > 0) {
+        for (i = 0; i < res; i++) {
+            printf("%d.", addr[i]);
+        }
+    }
+    printf("\n");
+    return NULL;
+}
+
 static int mqpub_con(void) {
     sock_udp_ep_t gw = { .family = AF_INET6, .port = MQTTSN_GATEWAY_PORT };
     int errno;
 
+    //(void) _resolve_gateway_ep();
     /* parse address */
     if (ipv6_addr_from_str((ipv6_addr_t *)&gw.addr.ipv6, MQTTSN_GATEWAY_HOST) == NULL) {
          printf("Bad address %s\n", MQTTSN_GATEWAY_HOST);
         return 1;
     }
+
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
          printf("error: unable to connect to gateway [%s]:%d (error %d)\n", MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT, errno);
         mqttsn_stats.connect_fail += 1;
@@ -166,6 +195,10 @@ static void *mqpub_thread(void *arg)
     
  again:
     state = MQTTSN_NOT_CONNECTED;
+#if 1
+    _resolve_gateway_ep();
+    state = 99;
+#endif
     sleepsecs = MQPUB_STATE_INTERVAL;
     while (1) {
       switch (state) {
@@ -198,16 +231,20 @@ static void *mqpub_thread(void *arg)
     return NULL;    /* shouldn't happen */
 }
 
+kernel_pid_t emcute_pid, mqpub_pid;
 void mqttsn_publisher_init(void) {
 
     _init_topic();
 
     /* start emcute thread */
-    thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, 0,
-                  emcute_thread, NULL, "emcute");
+    emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,
+                               emcute_thread, NULL, "emcute");
+    printf("Start emcute: pid %d\n", emcute_pid);
+    (void) emcute_thread; (void) emcute_stack;
     /* start publisher thread */
-    thread_create(mqpub_stack, sizeof(mqpub_stack), MQPUB_PRIO, 0,
-                  mqpub_thread, NULL, "mqttsn_publisher");
+    mqpub_pid = thread_create(mqpub_stack, sizeof(mqpub_stack), MQPUB_PRIO, THREAD_CREATE_STACKTEST,
+                              mqpub_thread, NULL, "mqpub");
+    printf("start mqpub: pid %d\n", mqpub_pid);
 }
 
 typedef enum {
