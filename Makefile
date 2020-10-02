@@ -11,6 +11,8 @@ RIOTBASE ?= $(CURDIR)/../RIOT-OS
 
 NETSTACK ?= sim7020
 
+USE_DNS ?= true
+
 ifeq ($(NETSTACK), sim7020)
   USEMODULE += sim7020_ipv6
   USEMODULE += sim7020_sock_udp
@@ -39,7 +41,9 @@ else ifeq ($(NETSTACK), gnrc)
   USEMODULE += gnrc_icmpv6_echo
 
 endif
-USEMODULE += sock_dns
+ifeq ($(USE_DNS),true)
+    USEMODULE += sock_dns
+endif
 USEMODULE += core_mbox
 # Add also the shell, some shell commands
 USEMODULE += shell
@@ -54,6 +58,12 @@ USEMODULE += emcute
 USEMODULE += xtimer
 USEMODULE += at24mac
 
+ifeq ($(USE_DNS),true)
+  CFLAGS += -DDNS_RESOLVER=\"::ffff:0808:0808\"
+endif
+ifeq ($(NETSTACK), sim7020)
+CFLAGS += -DAT_PRINT_INCOMING=1
+endif
 CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
 # Comment this out to disable code in RIOT that does safety checking

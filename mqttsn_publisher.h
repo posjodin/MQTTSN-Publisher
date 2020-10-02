@@ -13,6 +13,7 @@ void mqttsn_publisher_init(void);
 //#define MQTTSN_GATEWAY_HOST "fd95:9bba:768f:0:216:3eff:fec6:99db" /* lxc-ha IPv6 static ULA */
 //#define MQTTSN_GATEWAY_HOST "::ffff:82ed:ca25" /* minime.sjodin.net */
 #define MQTTSN_GATEWAY_HOST "::ffff:c010:7de8" /* lab-pc.ssvl.kth.se */
+//#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se" /* lab-pc.ssvl.kth.se */
 //#define MQTTSN_GATEWAY_HOST "::ffff:5eff:b333" /* home.sjodin.net */
 #endif /* MQTTSN_GATEWAY_HOST */
 

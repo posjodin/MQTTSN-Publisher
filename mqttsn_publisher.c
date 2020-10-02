@@ -14,6 +14,9 @@
 #include "msg.h"
 #include "net/emcute.h"
 #include "net/ipv6/addr.h"
+#if defined(MODULE_SOCK_DNS)
+#include "net/sock/dns.h"
+#endif
 #include "xtimer.h"
 
 #include "at24mac.h"
@@ -115,43 +118,43 @@ static int mqpub_pub(void) {
     return 0;
     
 }
-#include "net/sock/dns.h"
-    char *resolver = "::ffff:0808:0808";
-static sock_udp_ep_t *_resolve_gateway_ep(void) {
 
+static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
+    /* Is host a v6 address? */
+    if (ipv6_addr_from_str(result, host) != NULL) {
+        return 0;
+    }
+    
+#if defined(MODULE_SOCK_DNS) 
+#ifdef DNS_RESOLVER
     sock_dns_server.family = AF_INET6;
     sock_dns_server.port = 53;    
-    if (ipv6_addr_from_str((ipv6_addr_t *)&sock_dns_server.addr.ipv6, resolver) == NULL) {
-         printf("Bad resolver address %s\n", resolver);
-        return NULL;
+    if (ipv6_addr_from_str((ipv6_addr_t *)&sock_dns_server.addr.ipv6, DNS_RESOLVER) == NULL) {
+         printf("Bad resolver address %s\n", DNS_RESOLVER);
+         return -1;
     }
+#endif /* DNS_RESOLVER */
+    result->u64[0].u64 = 0;
+    result->u16[4].u16 = 0;
+    result->u16[5].u16 = 0xffff;
 
-    static uint8_t addr[32];
-    printf("QUERY resolver ");
-    ipv6_addr_print((ipv6_addr_t *) &sock_dns_server.addr.ipv6);
-    printf("\n");    
-    int res= sock_dns_query("www.kth.se", addr, AF_INET);
-    printf("sock_dns_query -> %d ", res);
-    int i;
-    if (res > 0) {
-        for (i = 0; i < res; i++) {
-            printf("%d.", addr[i]);
-        }
-    }
-    printf("\n");
-    return NULL;
+    int res= sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET);
+    return res;
+#else
+    return -1;
+#endif    
 }
 
 static int mqpub_con(void) {
     sock_udp_ep_t gw = { .family = AF_INET6, .port = MQTTSN_GATEWAY_PORT };
     int errno;
 
-    //(void) _resolve_gateway_ep();
     /* parse address */
-    if (ipv6_addr_from_str((ipv6_addr_t *)&gw.addr.ipv6, MQTTSN_GATEWAY_HOST) == NULL) {
+    if (0 && ipv6_addr_from_str((ipv6_addr_t *)&gw.addr.ipv6, MQTTSN_GATEWAY_HOST) == NULL) {
          printf("Bad address %s\n", MQTTSN_GATEWAY_HOST);
         return 1;
     }
+    (void) _resolve_v6addr(MQTTSN_GATEWAY_HOST, (ipv6_addr_t *) &gw.addr.ipv6);
 
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
          printf("error: unable to connect to gateway [%s]:%d (error %d)\n", MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT, errno);
@@ -195,10 +198,6 @@ static void *mqpub_thread(void *arg)
     
  again:
     state = MQTTSN_NOT_CONNECTED;
-#if 1
-    _resolve_gateway_ep();
-    state = 99;
-#endif
     sleepsecs = MQPUB_STATE_INTERVAL;
     while (1) {
       switch (state) {
