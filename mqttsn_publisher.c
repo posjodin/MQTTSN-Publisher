@@ -16,6 +16,8 @@
 #include "net/ipv6/addr.h"
 #if defined(MODULE_SOCK_DNS)
 #include "net/sock/dns.h"
+#else
+#include "net/sock/dns.h"
 #endif
 #include "xtimer.h"
 
@@ -141,6 +143,13 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
     int res= sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET);
     return res;
 #else
+    result->u64[0].u64 = 0;
+    result->u16[4].u16 = 0;
+    result->u16[5].u16 = 0xffff;
+
+    int res= sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET);
+    return res;
+
     return -1;
 #endif    
 }

@@ -8,19 +8,16 @@ BOARD ?= avr-rss2
 RIOTBASE ?= $(CURDIR)/../RIOT-OS
 
 # Network stack to use - sim7020 or gnrc
-
 NETSTACK ?= sim7020
 
 USE_DNS ?= true
 
 ifeq ($(NETSTACK), sim7020)
-  USEMODULE += sim7020_ipv6
   USEMODULE += sim7020_sock_udp
+  ifeq ($(USE_DNS), true)
+    USEMODULE += sim7020_sock_dns
+  endif
   USEMODULE += auto_init_sim7020
-  USEMODULE += at
-  USEMODULE += at_urc
-  USEMODULE += ipv6_addr
-  USEMODULE += ipv4_addr
 else ifeq ($(NETSTACK), gnrc)
   # Include packages that pull up and auto-init the link layer.
   # NOTE: 6LoWPAN will be included if IEEE802.15.4 devices are present
@@ -42,7 +39,7 @@ else ifeq ($(NETSTACK), gnrc)
 
 endif
 ifeq ($(USE_DNS),true)
-    USEMODULE += sock_dns
+  USEMODULE += sock_dns
 endif
 USEMODULE += core_mbox
 # Add also the shell, some shell commands
@@ -58,12 +55,13 @@ USEMODULE += emcute
 USEMODULE += xtimer
 USEMODULE += at24mac
 
-ifeq ($(USE_DNS),true)
-  CFLAGS += -DDNS_RESOLVER=\"::ffff:0808:0808\"
-endif
 ifeq ($(NETSTACK), sim7020)
 CFLAGS += -DAT_PRINT_INCOMING=1
+else ifeq ($(USE_DNS), true)
+  # Need resolver for DNS lookups
+  CFLAGS += -DDNS_RESOLVER=\"::ffff:0808:0808\"
 endif
+
 CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
 # Comment this out to disable code in RIOT that does safety checking
