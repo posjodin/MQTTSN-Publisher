@@ -1,7 +1,27 @@
 #ifndef MQTTSN_PUBLISHER_T
 #define MQTTSN_PUBLISHER_T
 
+typedef enum {
+    MQTTSN_NOT_CONNECTED,
+    MQTTSN_CONNECTED,
+    MQTTSN_PUBLISHING,
+} mqttsn_state_t;
+
+typedef struct mqttsn_stats {
+  uint16_t connect_ok;
+  uint16_t register_ok;
+  uint16_t publish_ok;
+  uint16_t connect_fail;
+  uint16_t register_fail;
+  uint16_t publish_fail;
+  uint16_t reset;
+} mqttsn_stats_t;
+
+extern mqttsn_stats_t mqttsn_stats;
+
 void mqttsn_publisher_init(void);
+mqttsn_state_t mqttsn_publisher_state(void);
+
 
 #ifndef MQTT_TOPIC_BASE
 #define MQTT_TOPIC_BASE "KTH/avr-rss2"
@@ -33,5 +53,7 @@ void mqttsn_publisher_init(void);
 int get_nodeid(char *buf, size_t size);
 
 size_t makereport(uint8_t *buffer, size_t len);
+
+int mqttsn_stats_cmd(int argc, char **argv);
 
 #endif /* MQTTSN_PUBLISHER_T */

@@ -42,22 +42,6 @@
 /* State machine interval in secs */
 #define MQPUB_STATE_INTERVAL 2
 
-typedef enum {
-    MQTTSN_NOT_CONNECTED,
-    MQTTSN_CONNECTED,
-    MQTTSN_PUBLISHING,
-} mqttsn_state_t;
-
-typedef struct mqttsn_stats {
-  uint16_t connect_ok;
-  uint16_t register_ok;
-  uint16_t publish_ok;
-  uint16_t connect_fail;
-  uint16_t register_fail;
-  uint16_t publish_fail;
-  uint16_t reset;
-} mqttsn_stats_t;
-
 mqttsn_stats_t mqttsn_stats;
 
 static char mqpub_stack[8*THREAD_STACKSIZE_DEFAULT];
@@ -107,7 +91,7 @@ static int mqpub_pub(void) {
     int errno;
     
     publen = makereport(publish_buffer, sizeof(publish_buffer));
-    printf("Publish %d: \"%s\"\n", publen, publish_buffer);
+    printf("mqpub: publish %d: \"%s\"\n", publen, publish_buffer);
     if ((errno = emcute_pub(&emcute_topic, publish_buffer, publen, flags)) != EMCUTE_OK) {
         printf("error: unable to publish data to topic '%s [%i]' (error %d)\n",
                emcute_topic.name, (int)emcute_topic.id, errno);
@@ -127,7 +111,7 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
         return 0;
     }
     
-#if defined(MODULE_SOCK_DNS) 
+#if defined(MODULE_SOCK_DNS) || defined(MODULE_SIM7020_SOCK_DNS) 
 #ifdef DNS_RESOLVER
     sock_dns_server.family = AF_INET6;
     sock_dns_server.port = 53;    
@@ -140,16 +124,12 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
     result->u16[4].u16 = 0;
     result->u16[5].u16 = 0xffff;
 
-    int res= sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET);
+    
+    int res;
+    while ((res = sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET)) != 0)
+        ;
     return res;
 #else
-    result->u64[0].u64 = 0;
-    result->u16[4].u16 = 0;
-    result->u16[5].u16 = 0xffff;
-
-    int res= sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET);
-    return res;
-
     return -1;
 #endif    
 }
@@ -164,7 +144,9 @@ static int mqpub_con(void) {
         return 1;
     }
     (void) _resolve_v6addr(MQTTSN_GATEWAY_HOST, (ipv6_addr_t *) &gw.addr.ipv6);
-
+    printf("mqpub: Connect to [");
+    ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
+    printf("]:%d\n", ntohs(gw.port));
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
          printf("error: unable to connect to gateway [%s]:%d (error %d)\n", MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT, errno);
         mqttsn_stats.connect_fail += 1;
@@ -178,6 +160,7 @@ static int mqpub_con(void) {
 static int mqpub_reg(void) {
     int errno;
     emcute_topic.name = topicstr;
+    printf("mqpub: register %s\n", emcute_topic.name);
     if ((errno = emcute_reg(&emcute_topic)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", topicstr, errno);
@@ -312,3 +295,25 @@ int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished) {
      return nread;
 }
 
+int mqttsn_stats_cmd(int argc, char **argv) {
+    (void) argc; (void) argv;
+    puts("MQTT-SN state: ");
+    switch (state) {
+      case MQTTSN_NOT_CONNECTED:
+          puts("not connected");
+          break;
+      case MQTTSN_CONNECTED:
+          puts("connected");
+          break;
+      case MQTTSN_PUBLISHING:
+          puts("publishing");
+    }
+    puts("\n");
+    puts("Statistics:");
+    mqttsn_stats_t *st = &mqttsn_stats;
+    printf("  connect: success %d, fail %d\n", st->connect_ok, st->connect_fail);
+    printf("  register: success %d, fail %d\n", st->register_ok, st->register_fail);
+    printf("  publish: success %d, fail %d\n", st->publish_ok, st->publish_fail);
+    printf("  reset: %d\n", st->reset);
+    return 0;
+}
