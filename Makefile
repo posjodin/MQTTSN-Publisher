@@ -36,11 +36,8 @@ else ifeq ($(NETSTACK), gnrc)
   #USEMODULE += gnrc_pktdump
   # Additional networking modules that can be dropped if not needed
   USEMODULE += gnrc_icmpv6_echo
+endif
 
-endif
-ifeq ($(USE_DNS),true)
-  USEMODULE += sock_dns
-endif
 USEMODULE += core_mbox
 # Add also the shell, some shell commands
 USEMODULE += shell
@@ -58,7 +55,8 @@ USEMODULE += at24mac
 ifeq ($(NETSTACK), sim7020)
 CFLAGS += -DAT_PRINT_INCOMING=1
 else ifeq ($(USE_DNS), true)
-  # Need resolver for DNS lookups
+  USEMODULE += sock_dns
+  # Need resolver for DNS lookups with gnrc
   CFLAGS += -DDNS_RESOLVER=\"::ffff:0808:0808\"
 endif
 
