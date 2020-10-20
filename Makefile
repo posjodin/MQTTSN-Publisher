@@ -60,6 +60,9 @@ else ifeq ($(USE_DNS), true)
   CFLAGS += -DDNS_RESOLVER=\"::ffff:0808:0808\"
 endif
 
+# Run MQTTSN publisher at start
+#CFLAGS += -DAUTO_INIT_MQTTSN
+
 CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
 # Comment this out to disable code in RIOT that does safety checking

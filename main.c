@@ -67,7 +67,9 @@ int main(void)
     ///* the main thread needs a msg queue to be able to run `ping6`*/
     msg_init_queue(_main_msg_queue, ARRAY_SIZE(_main_msg_queue));
 
+#ifdef AUTO_INIT_MQTTSN
     mqttsn_publisher_init();
+#endif /* AUTO_INIT_MQTTSN */
     /* start shell */
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
 
