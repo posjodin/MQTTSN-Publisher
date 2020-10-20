@@ -37,6 +37,7 @@ int sim7020cmd_close(int argc, char **argv);
 int sim7020cmd_connect(int argc, char **argv);
 int sim7020cmd_send(int argc, char **argv);
 int sim7020cmd_test(int argc, char **argv);
+int sim7020cmd_at(int arg, char **argv);
 int sim7020cmd_recv(int arg, char **argv);
 #endif /* MODULE_SIM7020 */
 
@@ -52,6 +53,7 @@ static const shell_command_t shell_commands[] = {
     { "usend", "Send on SIM7020 socket", sim7020cmd_send },
     { "uclose", "Close SIM7020 socket", sim7020cmd_close },
     { "utest", "repeat usend", sim7020cmd_test },                
+    { "at", "run AT command", sim7020cmd_at },
     { "mqttsn", "Run MQTT-SN client", run_mqttsn },                
     { "mqstat", "print MQTT status", mqttsn_stats_cmd},
     { NULL, NULL, NULL }
