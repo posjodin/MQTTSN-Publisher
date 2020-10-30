@@ -39,13 +39,15 @@ int sim7020cmd_send(int argc, char **argv);
 int sim7020cmd_test(int argc, char **argv);
 int sim7020cmd_at(int arg, char **argv);
 int sim7020cmd_recv(int arg, char **argv);
+int sim7020cmd_reset(int arg, char **argv);
 #endif /* MODULE_SIM7020 */
 
 static const shell_command_t shell_commands[] = {
     { "init", "Init SIM7020", sim7020cmd_init },
+    { "act", "Activate SIM7020", sim7020cmd_activate },
     { "register", "Register SIM7020", sim7020cmd_register },
     { "reg", "Register SIM7020", sim7020cmd_register },
-    { "act", "Activate SIM7020", sim7020cmd_activate },    
+    { "reset", "Reset SIM7020", sim7020cmd_reset },
     { "status", "Report SIM7020 status", sim7020cmd_status },
     { "stats", "Report SIM7020 statistics", sim7020cmd_stats },
     { "usock", "Create SIM7020 UDP socket", sim7020cmd_udp_socket },        
@@ -53,7 +55,7 @@ static const shell_command_t shell_commands[] = {
     { "usend", "Send on SIM7020 socket", sim7020cmd_send },
     { "uclose", "Close SIM7020 socket", sim7020cmd_close },
     { "utest", "repeat usend", sim7020cmd_test },                
-    { "at", "run AT command", sim7020cmd_at },
+    { "at", "run AT command, for example \"at AT+CSQ\"", sim7020cmd_at },
     { "mqttsn", "Run MQTT-SN client", run_mqttsn },                
     { "mqstat", "print MQTT status", mqttsn_stats_cmd},
     { NULL, NULL, NULL }

@@ -30,9 +30,9 @@
 #define EMCUTE_ID           ("sim7020-14b0")
 #endif
 #define EMCUTE_PORT         (1883U)
-#define EMCUTE_PRIO         (THREAD_PRIORITY_MAIN - 1)
+#define EMCUTE_PRIO         (THREAD_PRIORITY_MAIN + 1)
 
-#define MQPUB_PRIO         (THREAD_PRIORITY_MAIN - 1)
+#define MQPUB_PRIO         (THREAD_PRIORITY_MAIN + 1)
 
 #define NUMOFSUBS           (16U)
 #define TOPIC_MAXLEN        (64U)
@@ -41,6 +41,8 @@
 
 /* State machine interval in secs */
 #define MQPUB_STATE_INTERVAL 2
+/* Interval between DNS lookup attempts */
+#define MQPUB_RESOLVE_INTERVAL 30
 
 mqttsn_stats_t mqttsn_stats;
 
@@ -93,7 +95,7 @@ static int mqpub_pub(void) {
     publen = makereport(publish_buffer, sizeof(publish_buffer));
     printf("mqpub: publish %d: \"%s\"\n", publen, publish_buffer);
     if ((errno = emcute_pub(&emcute_topic, publish_buffer, publen, flags)) != EMCUTE_OK) {
-        printf("error: unable to publish data to topic '%s [%i]' (error %d)\n",
+        printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
                emcute_topic.name, (int)emcute_topic.id, errno);
         mqttsn_stats.publish_fail += 1;
         if (errno == EMCUTE_OVERFLOW)
@@ -126,8 +128,7 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
 
     
     int res;
-    while ((res = sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET)) != 0)
-        ;
+    res = sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET);
     return res;
 #else
     return -1;
@@ -137,13 +138,14 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
 static int mqpub_con(void) {
     sock_udp_ep_t gw = { .family = AF_INET6, .port = MQTTSN_GATEWAY_PORT };
     int errno;
-
+    
     /* parse address */
     if (0 && ipv6_addr_from_str((ipv6_addr_t *)&gw.addr.ipv6, MQTTSN_GATEWAY_HOST) == NULL) {
          printf("Bad address %s\n", MQTTSN_GATEWAY_HOST);
         return 1;
     }
-    (void) _resolve_v6addr(MQTTSN_GATEWAY_HOST, (ipv6_addr_t *) &gw.addr.ipv6);
+    if ((errno = _resolve_v6addr(MQTTSN_GATEWAY_HOST, (ipv6_addr_t *) &gw.addr.ipv6)) < 0)
+        return errno;
     printf("mqpub: Connect to [");
     ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
     printf("]:%d\n", ntohs(gw.port));
@@ -188,36 +190,36 @@ static void *mqpub_thread(void *arg)
     uint32_t sleepsecs;
     (void)arg;
     
- again:
+again:
     state = MQTTSN_NOT_CONNECTED;
     sleepsecs = MQPUB_STATE_INTERVAL;
     while (1) {
-      switch (state) {
-      case MQTTSN_NOT_CONNECTED:
-        if (mqpub_con() == 0)
-          state = MQTTSN_CONNECTED;
-        break;
-      case MQTTSN_CONNECTED:
-        if (mqpub_reg() == 0) {
-          state = MQTTSN_PUBLISHING;
+        switch (state) {
+        case MQTTSN_NOT_CONNECTED:
+            if (mqpub_con() == 0)
+                state = MQTTSN_CONNECTED;
+            break;
+        case MQTTSN_CONNECTED:
+            if (mqpub_reg() == 0) {
+                state = MQTTSN_PUBLISHING;
+            }
+            else {
+                mqpub_reset();
+                state = MQTTSN_NOT_CONNECTED;
+            }
+            break;
+        case MQTTSN_PUBLISHING:
+            if (mqpub_pub() != 0) {
+                mqpub_reset();
+                state = MQTTSN_NOT_CONNECTED;
+                goto again;
+            }
+            sleepsecs = MQTTSN_PUBLISH_INTERVAL;
+            break;
+        default:
+            break;
         }
-        else {
-          mqpub_reset();
-          state = MQTTSN_NOT_CONNECTED;
-        }
-        break;
-      case MQTTSN_PUBLISHING:
-        if (mqpub_pub() != 0) {
-          mqpub_reset();
-          state = MQTTSN_NOT_CONNECTED;
-          goto again;
-        }
-        sleepsecs = MQTTSN_PUBLISH_INTERVAL;
-        break;
-      default:
-        break;
-      }
-      xtimer_sleep(sleepsecs);
+        xtimer_sleep(sleepsecs);
     }
     return NULL;    /* shouldn't happen */
 }

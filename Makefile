@@ -5,7 +5,8 @@ APPLICATION = mqttsn_publisher
 BOARD ?= avr-rss2
 
 # This has to be the absolute path to the RIOT base directory:
-RIOTBASE ?= $(CURDIR)/../RIOT-OS
+#RIOTBASE ?= $(CURDIR)/../RIOT-OS
+RIOTBASE ?= $(CURDIR)/../RIOT-800
 
 # Network stack to use - sim7020 or gnrc
 NETSTACK ?= sim7020
@@ -43,6 +44,7 @@ USEMODULE += core_mbox
 USEMODULE += shell
 USEMODULE += shell_commands
 USEMODULE += ps
+USEMODULE += schedstatistics
 ifeq ($(NETSTACK), gnrc)
 USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6

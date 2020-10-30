@@ -84,6 +84,7 @@ int sim7020cmd_stats(int argc, char **argv) {
   printf("commfail_count: %d\n", ns->commfail_count);
   printf("reset_count: %d\n", ns->reset_count);
   printf("activation_fail_count: %d\n", ns->activation_fail_count);
+
   return 0;
 }
 
@@ -205,5 +206,10 @@ int sim7020cmd_at(int argc, char **argv) {
         (void) strlcat(cmd, argv[i], sizeof(cmd));
     }
     return sim7020_at(cmd);
+}
+
+int sim7020cmd_reset(int argc, char **argv) {
+    (void) argc; (void) argv;
+    return sim7020_reset();
 }
 
