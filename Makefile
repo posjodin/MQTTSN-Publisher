@@ -8,10 +8,15 @@ BOARD ?= avr-rss2
 #RIOTBASE ?= $(CURDIR)/../RIOT-OS
 RIOTBASE ?= $(CURDIR)/../RIOT-800
 
+EXTERNAL_MODULE_DIRS += $(CURDIR)/mqttsn_publisher
+INCLUDES += -I$(CURDIR)/mqttsn_publisher
+
 # Network stack to use - sim7020 or gnrc
 NETSTACK ?= sim7020
 
 USE_DNS ?= true
+
+USEMODULE += mqttsn_publisher
 
 ifeq ($(NETSTACK), sim7020)
   USEMODULE += sim7020_sock_udp
@@ -94,7 +99,6 @@ CFLAGS += -DI2C_NUMOF=1U -DI2C_BUS_SPEED=I2C_SPEED_NORMAL
 QUIET ?= 1
 
 # Specify custom dependencies for your application here ...
-APPDEPS = application.h
 ifeq ($(NETSTACK), gnrc)
   APPDEPS += gnrc_rpl.o
 endif
@@ -105,11 +109,6 @@ include $(RIOTBASE)/Makefile.include
 # otherwise you modify the standard target):
 
 #	./script.py
-
-application.h: Makefile
-	echo '#ifndef APPLICATION' >$@
-	echo '#define APPLICATION "'$(APPLICATION)'"' >>$@
-	echo '#endif' >>$@
 
 # Set a custom channel 
 # For KTH Contiki gateway
