@@ -1,0 +1,3 @@
+ifneq (,$(filter mqttsn_publisher,$(USEMODULE)))
+  USEMODULE += emcute
+endif
