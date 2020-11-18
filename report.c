@@ -22,6 +22,9 @@ static int seq_nr_value = 0;
 #if defined(MODULE_GNRC_RPL)
 int rpl_report(uint8_t *buf, size_t len, uint8_t *finished);
 #endif
+#if defined(MODULE_SIM7020)
+int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished);
+#endif
 int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished);
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished);
 
@@ -51,6 +54,9 @@ typedef enum {
 #if defined(MODULE_GNRC_RPL)
   s_rpl_report,
 #endif
+#if defined(MODULE_SIM7020)
+  s_sim7020_report,
+#endif
   s_mqttsn_report,
   s_max_report
 } report_state_t;
@@ -66,12 +72,35 @@ report_gen_t next_report_gen(void) {
      case s_rpl_report:
           return(rpl_report);
 #endif
+#if defined(MODULE_SIM7020)
+     case s_sim7020_report:
+          return(sim7020_report);
+#endif
      case s_mqttsn_report:
           return(mqttsn_report);
      default:
          printf("Bad report no %d\n", reportno);
      }
      return NULL;
+}
+
+static char *reportfunstr(report_gen_t fun) {
+  if (fun == NULL)
+    return "NUL";
+  else if (fun == boot_report)
+    return "boot";
+#if defined(MODULE_GNRC_RPL)
+  else if (fun == rpl_report)
+    return("rpl");
+#endif
+#if defined(MODULE_SIM7020)
+  else if (fun == sim7020_report)
+    return("sim7020");
+#endif
+  else if (fun == mqttsn_report)
+    return("mqttsn");
+  else
+    return("???");
 }
 
 /*
@@ -89,6 +118,7 @@ static size_t reports(uint8_t *buf, size_t len) {
      }
      do {
           int n = reportfun((uint8_t *) s + nread, l - nread, &finished);
+          printf("reportfun '%s', n %d (tot %d) finished %d\n", reportfunstr(reportfun), n, nread, (int) finished);
           if (n == 0)
                return (nread);
           else
