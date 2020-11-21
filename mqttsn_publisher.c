@@ -87,16 +87,14 @@ static void _init_topic(void) {
 
 uint8_t publish_buffer[MQTTSN_BUFFER_SIZE];
 
-static int mqpub_pub(void) {
+int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     unsigned flags = EMCUTE_QOS_1;
-    size_t publen;
     int errno;
     
-    publen = makereport(publish_buffer, sizeof(publish_buffer));
-    printf("mqpub: publish %d: \"%s\"\n", publen, publish_buffer);
-    if ((errno = emcute_pub(&emcute_topic, publish_buffer, publen, flags)) != EMCUTE_OK) {
+    printf("mqpub: publish  %d to %s: \"%s\"\n", len, topic->name, (char *) data);
+    if ((errno = emcute_pub((emcute_topic_t *) topic, data, len, flags)) != EMCUTE_OK) {
         printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
-               emcute_topic.name, (int)emcute_topic.id, errno);
+               topic->name, (int)topic->id, errno);
         mqttsn_stats.publish_fail += 1;
         if (errno == EMCUTE_OVERFLOW)
              return 0;
@@ -135,46 +133,46 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
 #endif    
 }
 
-static int mqpub_con(void) {
-    sock_udp_ep_t gw = { .family = AF_INET6, .port = MQTTSN_GATEWAY_PORT };
+int mqpub_con(char *host, uint16_t port) {
+  sock_udp_ep_t gw = { .family = AF_INET6, .port = port /* MQTTSN_GATEWAY_PORT */ };
     int errno;
     
     /* parse address */
-    if (0 && ipv6_addr_from_str((ipv6_addr_t *)&gw.addr.ipv6, MQTTSN_GATEWAY_HOST) == NULL) {
-         printf("Bad address %s\n", MQTTSN_GATEWAY_HOST);
-        return 1;
-    }
-    if ((errno = _resolve_v6addr(MQTTSN_GATEWAY_HOST, (ipv6_addr_t *) &gw.addr.ipv6)) < 0)
+    if ((errno = _resolve_v6addr(host, (ipv6_addr_t *) &gw.addr.ipv6)) < 0)
         return errno;
     printf("mqpub: Connect to [");
     ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
     printf("]:%d\n", ntohs(gw.port));
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
-         printf("error: unable to connect to gateway [%s]:%d (error %d)\n", MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT, errno);
+         printf("error: unable to connect to gateway [%s]:%d (error %d)\n", host, port, errno);
         mqttsn_stats.connect_fail += 1;
         return 1;
     }
-    printf("MQTT-SN: Connect to gateway [%s]:%d\n", MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+    printf("MQTT-SN: Connect to gateway [%s]:%d\n", host, port);
     mqttsn_stats.connect_ok += 1;
     return 0;
 }
 
-static int mqpub_reg(void) {
+static int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
     int errno;
-    emcute_topic.name = topicstr;
-    printf("mqpub: register %s\n", emcute_topic.name);
-    if ((errno = emcute_reg(&emcute_topic)) != EMCUTE_OK) {
+    topic->name = topicstr;
+    printf("mqpub: register %s\n", topic->name);
+    if ((errno = emcute_reg((emcute_topic_t *) topic)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", topicstr, errno);
         return 1;
     }
-    printf("Register topic %d for \"%s\"\n", (int)emcute_topic.id, topicstr);
+    printf("Register topic %d for \"%s\"\n", (int)topic->id, topicstr);
     mqttsn_stats.register_ok += 1;
     return 0;
 }
 
-static int mqpub_reset(void) {
-    int errno = emcute_discon();
+int mqpub_discon(void) {
+    return emcute_discon();
+}
+
+int mqpub_reset(void) {
+    int errno = mqpub_discon();
     mqttsn_stats.reset += 1;
     if (errno != EMCUTE_OK) {
         printf("MQTT-SN: disconnect failed %d\n", errno);
@@ -183,24 +181,44 @@ static int mqpub_reset(void) {
     return 0;
 }
 
+/*
+ * All-in-one publishing -- connect, register topic, publish and disconnect
+ */
+int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen) {
+    int res;
+    mqpub_topic_t topic;
+
+    res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+    if (res != 0)
+        return res;
+    res = mqpub_reg(&topic, topicstr);
+    if (res != 0)
+        return res;
+    res = mqpub_pub(&topic, data, datalen);
+    mqpub_reset();
+    return res;
+}
+
 static mqttsn_state_t state;
 
 static void *mqpub_thread(void *arg)
 {
     uint32_t sleepsecs;
     (void)arg;
-    
+    mqpub_topic_t topic;
+    size_t publen;
+
 again:
     state = MQTTSN_NOT_CONNECTED;
     sleepsecs = MQPUB_STATE_INTERVAL;
     while (1) {
         switch (state) {
         case MQTTSN_NOT_CONNECTED:
-            if (mqpub_con() == 0)
+            if (mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT) == 0)
                 state = MQTTSN_CONNECTED;
             break;
         case MQTTSN_CONNECTED:
-            if (mqpub_reg() == 0) {
+            if (mqpub_reg(&topic, topicstr) == 0) {
                 state = MQTTSN_PUBLISHING;
             }
             else {
@@ -209,13 +227,14 @@ again:
             }
             break;
         case MQTTSN_PUBLISHING:
-            if (mqpub_pub() != 0) {
+            publen = makereport(publish_buffer, sizeof(publish_buffer));
+            if (mqpub_pub(&topic, publish_buffer, publen) != 0) {
                 mqpub_reset();
                 state = MQTTSN_NOT_CONNECTED;
                 goto again;
             }
-            sleepsecs = MQTTSN_PUBLISH_INTERVAL;
-            break;
+        sleepsecs = MQTTSN_PUBLISH_INTERVAL;
+        break;
         default:
             break;
         }

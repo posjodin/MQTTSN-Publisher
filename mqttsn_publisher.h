@@ -1,6 +1,8 @@
 #ifndef MQTTSN_PUBLISHER_T
 #define MQTTSN_PUBLISHER_T
 
+#include "net/emcute.h"
+
 typedef enum {
     MQTTSN_NOT_CONNECTED,
     MQTTSN_CONNECTED,
@@ -18,6 +20,8 @@ typedef struct mqttsn_stats {
 } mqttsn_stats_t;
 
 extern mqttsn_stats_t mqttsn_stats;
+
+typedef emcute_topic_t mqpub_topic_t;
 
 void mqttsn_publisher_init(void);
 mqttsn_state_t mqttsn_publisher_state(void);
@@ -57,5 +61,7 @@ int get_nodeid(char *buf, size_t size);
 size_t makereport(uint8_t *buffer, size_t len);
 
 int mqttsn_stats_cmd(int argc, char **argv);
+
+int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
 
 #endif /* MQTTSN_PUBLISHER_T */
