@@ -62,6 +62,13 @@ size_t makereport(uint8_t *buffer, size_t len);
 
 int mqttsn_stats_cmd(int argc, char **argv);
 
+int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len);
+int mqpub_con(char *host, uint16_t port);
+int mqpub_reg(mqpub_topic_t *topic, char *topicstr);
+int mqpub_discon(void);
+int mqpub_reset(void);
+size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix);
+
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
 
 #endif /* MQTTSN_PUBLISHER_T */

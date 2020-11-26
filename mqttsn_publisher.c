@@ -46,7 +46,9 @@
 
 mqttsn_stats_t mqttsn_stats;
 
+#ifdef MQTTSN_PUBLISHER_THREAD
 static char mqpub_stack[8*THREAD_STACKSIZE_DEFAULT];
+#endif
 static char emcute_stack[8*THREAD_STACKSIZE_DEFAULT];
 
 static char topicstr[MQPUB_TOPIC_LENGTH];
@@ -82,6 +84,22 @@ static void _init_topic(void) {
     n += get_nodeid(topicstr + n, sizeof(topicstr) - n);
     n += snprintf(topicstr + n, sizeof(topicstr) - n, "/sensors");
     printf("_init topicstr is %s\n", topicstr);
+}
+
+size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix) {
+  
+    //static char nodeid[sizeof(e64.uint8)*2+1];
+    char *buf = topic;
+    size_t len = topiclen;
+    int n;
+    
+    n = snprintf(buf, len, "%s/", MQTT_TOPIC_BASE);
+    n += get_nodeid(buf + n, len - n);
+    if (suffix != NULL) {
+        n += snprintf(buf + n, len - n, suffix);
+    }
+    printf("_init topicstr is %s\n", topic);
+    return n;
 }
 
 
@@ -153,7 +171,7 @@ int mqpub_con(char *host, uint16_t port) {
     return 0;
 }
 
-static int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
+int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
     int errno;
     topic->name = topicstr;
     printf("mqpub: register %s\n", topic->name);
@@ -182,23 +200,27 @@ int mqpub_reset(void) {
 }
 
 /*
- * All-in-one publishing -- connect, register topic, publish and disconnect
+ * One-stop publishing -- connect, register topic, publish and disconnect
  */
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen) {
     int res;
     mqpub_topic_t topic;
 
     res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+    printf("*con %d\n", res);
     if (res != 0)
         return res;
     res = mqpub_reg(&topic, topicstr);
+    printf("*reg %d\n", res);
     if (res != 0)
         return res;
     res = mqpub_pub(&topic, data, datalen);
+    printf("*pub %d\n", res);
     mqpub_reset();
     return res;
 }
 
+#ifdef MQTTSN_PUBLISHER_THREAD
 static mqttsn_state_t state;
 
 static void *mqpub_thread(void *arg)
@@ -242,8 +264,15 @@ again:
     }
     return NULL;    /* shouldn't happen */
 }
+#endif /* MQTTSN_PUBLISHER_THREAD */
 
-kernel_pid_t emcute_pid, mqpub_pid;
+
+kernel_pid_t emcute_pid;
+
+#ifdef MQTTSN_PUBLISHER_THREAD
+kernel_pid_t mqpub_pid;
+#endif /* MQTTSN_PUBLISHER_THREAD */
+
 void mqttsn_publisher_init(void) {
 
     _init_topic();
@@ -253,10 +282,12 @@ void mqttsn_publisher_init(void) {
                                emcute_thread, NULL, "emcute");
     printf("Start emcute: pid %d\n", emcute_pid);
     (void) emcute_thread; (void) emcute_stack;
+#ifdef MQTTSN_PUBLISHER_THREAD
     /* start publisher thread */
     mqpub_pid = thread_create(mqpub_stack, sizeof(mqpub_stack), MQPUB_PRIO, THREAD_CREATE_STACKTEST,
                               mqpub_thread, NULL, "mqpub");
     printf("start mqpub: pid %d\n", mqpub_pid);
+#endif /* MQTTSN_PUBLISHER_THREAD */
 }
 
 typedef enum {
@@ -319,6 +350,7 @@ int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished) {
 int mqttsn_stats_cmd(int argc, char **argv) {
     (void) argc; (void) argv;
     puts("MQTT-SN state: ");
+#ifdef MQTTSN_PUBLISHER_THREAD
     switch (state) {
       case MQTTSN_NOT_CONNECTED:
           puts("not connected");
@@ -329,6 +361,9 @@ int mqttsn_stats_cmd(int argc, char **argv) {
       case MQTTSN_PUBLISHING:
           puts("publishing");
     }
+#else
+    puts("not started");
+#endif /* MQTTSN_PUBLISHER_THREAD */
     puts("\n");
     puts("Statistics:");
     mqttsn_stats_t *st = &mqttsn_stats;
