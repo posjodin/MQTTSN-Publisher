@@ -114,8 +114,6 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
         printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
                topic->name, (int)topic->id, errno);
         mqttsn_stats.publish_fail += 1;
-        if (errno == EMCUTE_OVERFLOW)
-             return 0;
         return errno;
     }
     mqttsn_stats.publish_ok += 1;

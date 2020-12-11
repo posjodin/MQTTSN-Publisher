@@ -10,7 +10,7 @@
 /*
  * Macros for writing sensor records 
  * A record is a unit of text that must be kept together 
- * in a report, ie to represent a senml element
+ * in a report, eg to represent a senml element
  */
 
 //#define WARN printf
