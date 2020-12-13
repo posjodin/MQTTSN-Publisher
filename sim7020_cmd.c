@@ -74,16 +74,29 @@ int sim7020cmd_stats(int argc, char **argv) {
   (void) argc; (void) argv;
   sim7020_netstats_t *ns = sim7020_get_netstats();
 
-  printf("tx_unicast_count: %d\n", ns->tx_unicast_count);
-  printf("tx_mcast_count: %d\n", ns->tx_mcast_count);
-  printf("tx_success: %d\n", ns->tx_success);
-  printf("tx_failed: %d\n", ns->tx_failed);
-  printf("tx_bytes: %d\n", ns->tx_bytes);
-  printf("rx_count: %d\n", ns->rx_count);
-  printf("rx_bytes: %d\n", ns->rx_bytes);
-  printf("commfail_count: %d\n", ns->commfail_count);
-  printf("reset_count: %d\n", ns->reset_count);
-  printf("activation_fail_count: %d\n", ns->activation_fail_count);
+  printf("tx_unicast_count: %" PRIu32 "\n", ns->tx_unicast_count);
+  printf("tx_mcast_count: %" PRIu32 "\n", ns->tx_mcast_count);
+  printf("tx_success: %" PRIu32 "\n", ns->tx_success);
+  printf("tx_failed: %" PRIu32 "\n", ns->tx_failed);
+  printf("tx_bytes: %" PRIu32 "\n", ns->tx_bytes);
+  printf("rx_count: %" PRIu32 "\n", ns->rx_count);
+  printf("rx_bytes: %" PRIu32 "\n", ns->rx_bytes);
+  printf("commfail_count: %" PRIu32 "\n", ns->commfail_count);
+  printf("reset_count: %" PRIu32 "\n", ns->reset_count);
+  printf("activation_fail_count: %" PRIu32 "\n", ns->activation_fail_count);
+  {
+    extern uint32_t sim7020_activation_usecs;
+    if (sim7020_active()) {
+      printf("activation_time: %" PRIu32 "\n", sim7020_activation_usecs/1000);
+    }
+  }
+  {
+    extern uint64_t sim7020_prev_active_duration_usecs;
+    if (sim7020_prev_active_duration_usecs != 0) {
+      printf("prev_duration: %" PRIu32 "\n", (uint32_t) (sim7020_prev_active_duration_usecs/1000));
+    }
+  }
+
 
   return 0;
 }
