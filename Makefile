@@ -5,8 +5,7 @@ APPLICATION = mqttsn_publisher
 BOARD ?= avr-rss2
 
 # This has to be the absolute path to the RIOT base directory:
-#RIOTBASE ?= $(CURDIR)/../RIOT-OS
-RIOTBASE ?= $(CURDIR)/../RIOT-800
+RIOTBASE ?= $(CURDIR)/../RIOT-OS
 
 EXTERNAL_MODULE_DIRS += $(CURDIR)/mqttsn_publisher
 INCLUDES += -I$(CURDIR)/mqttsn_publisher
@@ -67,8 +66,10 @@ else ifeq ($(USE_DNS), true)
   CFLAGS += -DDNS_RESOLVER=\"::ffff:0808:0808\"
 endif
 
-# Run MQTTSN publisher at start
-#CFLAGS += -DAUTO_INIT_MQTTSN
+# Enable publisher thread
+CFLAGS += -DMQTTSN_PUBLISHER_THREAD
+# Autolauch at startup
+CFLAGS += -DAUTO_INIT_MQTTSN
 
 CFLAGS += -DDEBUG_ASSERT_VERBOSE
 
