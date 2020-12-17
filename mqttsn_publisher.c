@@ -96,7 +96,7 @@ size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix) {
     n = snprintf(buf, len, "%s/", MQTT_TOPIC_BASE);
     n += get_nodeid(buf + n, len - n);
     if (suffix != NULL) {
-        n += snprintf(buf + n, len - n, suffix);
+        n += snprintf(buf + n, len - n, "%s", suffix);
     }
     printf("_init topicstr is %s\n", topic);
     return n;
@@ -158,7 +158,7 @@ int mqpub_con(char *host, uint16_t port) {
         return errno;
     printf("mqpub: Connect to [");
     ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
-    printf("]:%d\n", ntohs(gw.port));
+    printf("]:%d\n", gw.port);
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
          printf("error: unable to connect to gateway [%s]:%d (error %d)\n", host, port, errno);
         mqttsn_stats.connect_fail += 1;
@@ -227,6 +227,7 @@ static void *mqpub_thread(void *arg)
     (void)arg;
     mqpub_topic_t topic;
     size_t publen;
+    int res;
 
 again:
     state = MQTTSN_NOT_CONNECTED;
@@ -234,7 +235,9 @@ again:
     while (1) {
         switch (state) {
         case MQTTSN_NOT_CONNECTED:
-            if (mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT) == 0)
+            res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+            printf("mqpub_connect: %d\n", res);
+            if (res == 0)
                 state = MQTTSN_CONNECTED;
             break;
         case MQTTSN_CONNECTED:
