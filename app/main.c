@@ -14,8 +14,11 @@
 #include "net/emcute.h"
 #include "net/ipv6/addr.h"
 
+#ifdef MODULE_MQTTSN_PUBLISHER
 #include "mqttsn_publisher.h"
+#endif
 
+#if 0
 static int run_mqttsn(int argc, char **argv)
 {
     if (argc != 1) {
@@ -25,6 +28,7 @@ static int run_mqttsn(int argc, char **argv)
     mqttsn_publisher_init();
     return 0;
 }
+#endif
 
 #ifdef MODULE_SIM7020
 int sim7020cmd_init(int argc, char **argv);
@@ -43,6 +47,7 @@ int sim7020cmd_reset(int arg, char **argv);
 #endif /* MODULE_SIM7020 */
 
 static const shell_command_t shell_commands[] = {
+#ifdef MODULE_SIM7020
     { "init", "Init SIM7020", sim7020cmd_init },
     { "act", "Activate SIM7020", sim7020cmd_activate },
     { "register", "Register SIM7020", sim7020cmd_register },
@@ -56,8 +61,10 @@ static const shell_command_t shell_commands[] = {
     { "uclose", "Close SIM7020 socket", sim7020cmd_close },
     { "utest", "repeat usend", sim7020cmd_test },                
     { "at", "run AT command, for example \"at AT+CSQ\"", sim7020cmd_at },
-    { "mqttsn", "Run MQTT-SN client", run_mqttsn },                
+#endif /* MODULE_SIM7020 */
+#ifdef MODULE_MQTTSN_PUBLISHER
     { "mqstat", "print MQTT status", mqttsn_stats_cmd},
+#endif /* MODULE_MQTTSN_PUBLISHER */
     { NULL, NULL, NULL }
 };
 
@@ -76,7 +83,6 @@ int main(void)
 #endif /* AUTO_INIT_MQTTSN */
     /* start shell */
     shell_run(shell_commands, line_buf, SHELL_DEFAULT_BUFSIZE);
-
     /* should never be reached */
     return 0;
 }
