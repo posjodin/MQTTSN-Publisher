@@ -13,10 +13,13 @@
  * in a report, eg to represent a senml element
  */
 
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h" 
+#endif
+
 //#define WARN printf
 #define WARN(...)
 
-   
 /*
  * Mark start of a record. 
  * Save current state as starting state (string pointer and length).
