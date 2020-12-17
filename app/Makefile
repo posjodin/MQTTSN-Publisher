@@ -9,7 +9,7 @@ RIOTBASE ?= $(CURDIR)/../../RIOT-OS
 
 
 # Network stack to use - sim7020 or gnrc
-NETSTACK ?= gnrc
+NETSTACK ?= sim7020
 
 # MQTT-SN publisher config
 #

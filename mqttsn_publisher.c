@@ -54,10 +54,21 @@ static char emcute_stack[8*THREAD_STACKSIZE_DEFAULT];
 static char topicstr[MQPUB_TOPIC_LENGTH];
 emcute_topic_t emcute_topic;
 
+static int client_id(char *id, int idlen, char *prefix) {
+
+    char nid[sizeof(eui64_t)*2+1]; /* EUI-64 in hex + NULL */
+    get_nodeid(nid, sizeof(nid));
+    int n = snprintf(id, idlen, "%s%s", prefix != NULL ? prefix : "", nid[10]);
+    printf("emcute client_id %s\n", id);
+    return n;
+}
 static void *emcute_thread(void *arg)
 {
-    (void)arg;
-    emcute_run(EMCUTE_PORT, EMCUTE_ID);
+    char *prefix = (char *) arg;
+    char cli_id[24];
+
+    client_id(cli_id, sizeof(cli_id), prefix);
+    emcute_run(EMCUTE_PORT, cli_id);
     return NULL;    /* should never be reached */
 }
 
