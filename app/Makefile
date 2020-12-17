@@ -5,11 +5,11 @@ APPLICATION = mqttsn_publisher
 BOARD ?= avr-rss2
 
 # This has to be the absolute path to the RIOT base directory:
-RIOTBASE ?= $(CURDIR)/../../../RIOT-OS
+RIOTBASE ?= $(CURDIR)/../../RIOT-OS
 
 
 # Network stack to use - sim7020 or gnrc
-NETSTACK ?= sim7020
+NETSTACK ?= gnrc
 
 # MQTT-SN publisher config
 #
@@ -33,6 +33,9 @@ CFLAGS += -DMQTTSN_GATEWAY_HOST=\"fd95:9bba:768f:0:216:3eff:fec6:99db\"
 #CFLAGS += -DMQTTSN_GATEWAY_HOST=\"2001:6b0:32:13::232\"
 #CFLAGS += -DMQTTSN_GATEWAY_HOST=\"lab-pc.ssvl.kth.se\"
 CFLAFS += DMQTTSN_GATEWAY_PORT=10000
+
+USEMODULE += emcute
+CFLAGS += -DEMCUTE_ID=\"rpl-857b\"
 
 ifeq ($(NETSTACK), sim7020)
   USEMODULE += sim7020_sock_udp
@@ -61,6 +64,8 @@ else ifeq ($(NETSTACK), gnrc)
   #USEMODULE += gnrc_pktdump
   # Additional networking modules that can be dropped if not needed
   USEMODULE += gnrc_icmpv6_echo
+  # Autoinit RPL on single interface
+  USEMODULE += gnrc_netif_single
 endif
 
 USEMODULE += core_mbox
@@ -74,7 +79,6 @@ USEMODULE += netstats_l2
 USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
 endif
-USEMODULE += emcute
 USEMODULE += xtimer
 USEMODULE += at24mac
 
@@ -100,13 +104,10 @@ ifeq ($(NETSTACK), gnrc)
   # DODAG Configuration Options (see the doc for more info)
   # CFLAGS += -DGNRC_RPL_DODAG_CONF_OPTIONAL_ON_JOIN
 
-  # DNS with gnrc needs DNS resolver to be specified
+  # DNS with gnrc needs DNS resolver
   ifeq ($(USE_DNS), true)
     CFLAGS += -DDNS_RESOLVER=\"2001:4860:4860::8888\"
   endif
-
-  # For RPL auto initialization
-  CFLAGS += -DGNRC_RPL_DEFAULT_NETIF=6
 endif
 
 # Override I2C defaults for lower speed
