@@ -24,6 +24,9 @@
 
 #include "report.h"
 
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h"
+#endif
 
 #ifdef MODULE_NETSTATS_RPL
 typedef enum {s_dio, s_dis, s_dao, s_dao_ack} s_stats_t;

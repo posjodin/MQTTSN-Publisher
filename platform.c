@@ -13,6 +13,10 @@
 #include "mqttsn_publisher.h"
 #include "report.h"
 
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h"
+#endif
+
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished) {
      char *s = (char *) buf;
      size_t l = len;

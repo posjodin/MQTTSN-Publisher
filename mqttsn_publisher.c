@@ -58,8 +58,8 @@ static int client_id(char *id, int idlen, char *prefix) {
 
     char nid[sizeof(eui64_t)*2+1]; /* EUI-64 in hex + NULL */
     get_nodeid(nid, sizeof(nid));
-    int n = snprintf(id, idlen, "%s%s", prefix != NULL ? prefix : "", nid[10]);
-    printf("emcute client_id %s\n", id);
+    assert(strlen(nid) > 12);
+    int n = snprintf(id, idlen, "%s%s", prefix != NULL ? prefix : "", &nid[12]);
     return n;
 }
 static void *emcute_thread(void *arg)

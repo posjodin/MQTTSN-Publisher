@@ -17,6 +17,13 @@
 #include "mqttsn_publisher.h"
 #include "report.h"
 
+#define ENABLE_DEBUG    (0)
+#include "debug.h"
+
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h"
+#endif
+
 static int seq_nr_value = 0;
 
 #if defined(MODULE_GNRC_RPL)
@@ -118,7 +125,7 @@ static size_t reports(uint8_t *buf, size_t len) {
      }
      do {
           int n = reportfun((uint8_t *) s + nread, l - nread, &finished);
-          printf("reportfun '%s', n %d (tot %d) finished %d\n", reportfunstr(reportfun), n, nread, (int) finished);
+          DEBUG("reportfun '%s', n %d (tot %d) finished %d\n", reportfunstr(reportfun), n, nread, (int) finished);
           if (n == 0)
                return (nread);
           else
