@@ -20,6 +20,10 @@
 
 #include "net/sim7020.h"
 
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h"
+#endif
+
 typedef enum {
     s_traffic, s_delay,
 } sim7020_report_state_t;

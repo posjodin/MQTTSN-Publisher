@@ -26,8 +26,8 @@
 #include "mqttsn_publisher.h"
 #include "report.h"
 
-#ifndef EMCUTE_ID
-#define EMCUTE_ID           ("sim7020-14b0")
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h"
 #endif
 #define EMCUTE_PORT         (1883U)
 #define EMCUTE_PRIO         (THREAD_PRIORITY_MAIN + 1)
@@ -47,17 +47,28 @@
 mqttsn_stats_t mqttsn_stats;
 
 #ifdef MQTTSN_PUBLISHER_THREAD
-static char mqpub_stack[8*THREAD_STACKSIZE_DEFAULT];
+static char mqpub_stack[THREAD_STACKSIZE_DEFAULT];
 #endif
-static char emcute_stack[8*THREAD_STACKSIZE_DEFAULT];
+static char emcute_stack[2*THREAD_STACKSIZE_DEFAULT];
 
 static char topicstr[MQPUB_TOPIC_LENGTH];
 emcute_topic_t emcute_topic;
 
+static int client_id(char *id, int idlen, char *prefix) {
+
+    char nid[sizeof(eui64_t)*2+1]; /* EUI-64 in hex + NULL */
+    get_nodeid(nid, sizeof(nid));
+    assert(strlen(nid) > 12);
+    int n = snprintf(id, idlen, "%s%s", prefix != NULL ? prefix : "", &nid[12]);
+    return n;
+}
 static void *emcute_thread(void *arg)
 {
-    (void)arg;
-    emcute_run(EMCUTE_PORT, EMCUTE_ID);
+    char *prefix = (char *) arg;
+    char cli_id[24];
+
+    client_id(cli_id, sizeof(cli_id), prefix);
+    emcute_run(EMCUTE_PORT, cli_id);
     return NULL;    /* should never be reached */
 }
 
@@ -77,18 +88,15 @@ int get_nodeid(char *buf, size_t size) {
 
 static void _init_topic(void) {
   
-    //static char nodeid[sizeof(e64.uint8)*2+1];
     int n; 
 
     n = snprintf(topicstr, sizeof(topicstr), "%s/", MQTT_TOPIC_BASE);
     n += get_nodeid(topicstr + n, sizeof(topicstr) - n);
     n += snprintf(topicstr + n, sizeof(topicstr) - n, "/sensors");
-    printf("_init topicstr is %s\n", topicstr);
 }
 
 size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix) {
   
-    //static char nodeid[sizeof(e64.uint8)*2+1];
     char *buf = topic;
     size_t len = topiclen;
     int n;
@@ -96,9 +104,8 @@ size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix) {
     n = snprintf(buf, len, "%s/", MQTT_TOPIC_BASE);
     n += get_nodeid(buf + n, len - n);
     if (suffix != NULL) {
-        n += snprintf(buf + n, len - n, suffix);
+        n = strlcat(buf, suffix, len - n);
     }
-    printf("_init topicstr is %s\n", topic);
     return n;
 }
 
@@ -158,7 +165,7 @@ int mqpub_con(char *host, uint16_t port) {
         return errno;
     printf("mqpub: Connect to [");
     ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
-    printf("]:%d\n", ntohs(gw.port));
+    printf("]:%d\n", gw.port);
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
          printf("error: unable to connect to gateway [%s]:%d (error %d)\n", host, port, errno);
         mqttsn_stats.connect_fail += 1;
@@ -227,6 +234,7 @@ static void *mqpub_thread(void *arg)
     (void)arg;
     mqpub_topic_t topic;
     size_t publen;
+    int res;
 
 again:
     state = MQTTSN_NOT_CONNECTED;
@@ -234,7 +242,9 @@ again:
     while (1) {
         switch (state) {
         case MQTTSN_NOT_CONNECTED:
-            if (mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT) == 0)
+            res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+            printf("mqpub_connect: %d\n", res);
+            if (res == 0)
                 state = MQTTSN_CONNECTED;
             break;
         case MQTTSN_CONNECTED:
