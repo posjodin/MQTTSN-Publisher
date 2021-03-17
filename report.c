@@ -17,6 +17,10 @@
 #include "mqttsn_publisher.h"
 #include "report.h"
 
+#ifdef EPCGW
+#include "../epcgw.h"
+#endif /* EPCGW */
+
 static int seq_nr_value = 0;
 
 #if defined(MODULE_GNRC_RPL)
@@ -67,6 +71,15 @@ report_gen_t next_report_gen(void) {
      if (reportno++ == 0)
        return(boot_report);
 
+#ifdef EPCGW
+     /* EPC reports have priority. If there is an epc report
+      * waiting, send it now
+      */
+     report_gen_t epcgen = epcgw_report_gen();
+     if (epcgen != NULL)
+         return epcgen;
+#endif /* EPCGW */
+
      switch (reportno % s_max_report) {
 #if defined(MODULE_GNRC_RPL)
      case s_rpl_report:
@@ -105,6 +118,8 @@ static char *reportfunstr(report_gen_t fun) {
 
 /*
  * Reports -- build report by writing records to buffer 
+ * Call report function generator to schedule next report function.
+ * The report function fills the report with sensor data
  */
 static size_t reports(uint8_t *buf, size_t len) {
      char *s = (char *) buf;
@@ -128,6 +143,10 @@ static size_t reports(uint8_t *buf, size_t len) {
      return (nread);
 }
 
+/*
+ * make a sensor report. Write senml preamble to buffer, then call report function to fill
+ * with data, and then write senml finish
+ */
 size_t makereport(uint8_t *buffer, size_t len) {
      char *s = (char *) buffer;
      size_t l = len;

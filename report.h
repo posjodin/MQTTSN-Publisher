@@ -43,6 +43,8 @@
 /*
  * End of record -- commit if succeeded, else abort and revert to
  * starting state.
+ * Causes current function to return. The return value is NREAD
+ * plus the number of chars successfully written.
  */
 #define RECORD_END(NREAD)                                               \
    goto _notfull;                                                       \
@@ -73,5 +75,12 @@
    }                                                                    \
    
 
+/*
+ * Report generator.
+ * Write a report into buffer buf of size len.
+ * Return the number of bytes written (zero if the report did not fit).
+ * Upon return, *finished is set to 0 if there are more reports that
+ * should be sent, but did not fit. Otherwise *finished is set to 1.
+ */
 typedef int (* report_gen_t)(uint8_t *buf, size_t len, uint8_t *finished);
 
