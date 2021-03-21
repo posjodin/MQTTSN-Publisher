@@ -51,7 +51,7 @@ void mqttsn_publisher_init(void);
 
 int get_nodeid(char *buf, size_t size);
 
-size_t makereport(uint8_t *buffer, size_t len);
+size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished);
 
 int mqttsn_stats_cmd(int argc, char **argv);
 
@@ -64,4 +64,5 @@ size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix);
 
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
 
+void mqpub_report_ready(void);
 #endif /* MQTTSN_PUBLISHER_T */
