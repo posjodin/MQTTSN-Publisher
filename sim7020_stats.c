@@ -25,19 +25,32 @@
 #endif
 
 typedef enum {
-    s_traffic, s_delay,
+  s_register, s_traffic, s_delay,
 } sim7020_report_state_t;
 
 static int stats(char *str, size_t len, uint8_t *finished) {
     char *s = str;
     size_t l = len;
-    static sim7020_report_state_t state = s_traffic;
+    static sim7020_report_state_t state = s_register;
     sim7020_netstats_t *ns;
     int nread = 0;
   
     *finished = 0;
     
     switch (state) {
+    case s_register:
+        RECORD_START(s + nread, l - nread);
+        PUTFMT(",{\"n\":\"sim7020;register;\",\"vj\":[");
+        PUTFMT("{\"n\":\"imsi\",\"vs\":\"");
+        RECORD_ADD((unsigned) sim7020_imsi(RECORD_STR(), RECORD_LEN()));
+        PUTFMT("\"},");
+        PUTFMT("{\"n\":\"imei\",\"vs\":\"");
+        RECORD_ADD((unsigned) sim7020_imei(RECORD_STR(), RECORD_LEN()));
+        PUTFMT("\"}");
+        PUTFMT("]}");
+        RECORD_END(nread);
+        state = s_traffic;
+        break;
     case s_traffic:
         ns = sim7020_get_netstats();
 
