@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #include "shell.h"
+#include "mbox.h"
 #include "msg.h"
 #include "net/emcute.h"
 #include "net/ipv6/addr.h"
@@ -226,49 +227,104 @@ int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen) {
 }
 
 #ifdef MQTTSN_PUBLISHER_THREAD
+
+enum {
+  MSG_EVT_ASYNC,
+  MSG_EVT_PERIODIC,
+};
+
+static mbox_t evt_mbox;
+
+static void _periodic_callback(void *arg)
+{
+    msg_t msg = { .type = MSG_EVT_PERIODIC };
+    mbox_t *mbox = arg;
+
+    /* should be safe, because otherwise if mbox were filled this callback is
+     * senseless */
+    mbox_try_put(mbox, &msg);
+}
+
+void mqpub_report_ready(void) {
+    msg_t msg = { .type = MSG_EVT_ASYNC };
+    mbox_t *mbox = &evt_mbox;
+
+    /* should be safe, because otherwise if mbox were filled this callback is
+     * senseless */
+    mbox_try_put(mbox, &msg);
+}
+
 static mqttsn_state_t state;
 
 static void *mqpub_thread(void *arg)
 {
-    uint32_t sleepsecs;
     (void)arg;
+    uint32_t sleepsecs;
     mqpub_topic_t topic;
     size_t publen;
     int res;
+    xtimer_t periodic_timer;
 
 again:
+    periodic_timer.callback = _periodic_callback;
+    periodic_timer.arg = &evt_mbox;
+
     state = MQTTSN_NOT_CONNECTED;
-    sleepsecs = MQPUB_STATE_INTERVAL;
     while (1) {
         switch (state) {
         case MQTTSN_NOT_CONNECTED:
             res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
-            printf("mqpub_connect: %d\n", res);
-            if (res == 0)
-                state = MQTTSN_CONNECTED;
-            break;
+            //printf("mqpub_connect: %d\n", res);
+            if (res != 0)
+                break;
+            state = MQTTSN_CONNECTED;
+            /* fall through */
         case MQTTSN_CONNECTED:
-            if (mqpub_reg(&topic, topicstr) == 0) {
-                state = MQTTSN_PUBLISHING;
-            }
-            else {
+            if (mqpub_reg(&topic, topicstr) != 0) {
                 mqpub_reset();
                 state = MQTTSN_NOT_CONNECTED;
+                break;
             }
-            break;
+            state = MQTTSN_PUBLISHING;
+            /* fall through */
         case MQTTSN_PUBLISHING:
-            publen = makereport(publish_buffer, sizeof(publish_buffer));
-            if (mqpub_pub(&topic, publish_buffer, publen) != 0) {
-                mqpub_reset();
-                state = MQTTSN_NOT_CONNECTED;
-                goto again;
-            }
-        sleepsecs = MQTTSN_PUBLISH_INTERVAL;
+        {
+            static uint8_t finished;
+            do {
+                publen = makereport(publish_buffer, sizeof(publish_buffer), &finished);
+                if (mqpub_pub(&topic, publish_buffer, publen) != 0) {
+                    mqpub_reset();
+                    state = MQTTSN_NOT_CONNECTED;
+                    goto again;
+                }
+            } while (!finished);
+        }
         break;
         default:
             break;
         }
-        xtimer_sleep(sleepsecs);
+        /* Wait for something to happen -- periodic timer or async
+         * request to publish
+         */
+        if (state != MQTTSN_CONNECTED)
+            sleepsecs = MQPUB_STATE_INTERVAL;
+        else
+            sleepsecs = MQTTSN_PUBLISH_INTERVAL;
+        xtimer_set(&periodic_timer, sleepsecs*1000000);
+
+        msg_t msg;
+        mbox_get(&evt_mbox, &msg);
+        switch (msg.type) {
+        case MSG_EVT_ASYNC:
+            printf("mqttsn_state: async\n");
+            break;
+        case MSG_EVT_PERIODIC:
+            printf("mqttsn_state: periodic\n");
+            xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*1000000);
+            break;
+        default:
+            printf("mqttsn_state: bad type %d\n", msg.type);
+        }
     }
     return NULL;    /* shouldn't happen */
 }
