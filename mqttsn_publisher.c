@@ -306,7 +306,7 @@ again:
         /* Wait for something to happen -- periodic timer or async
          * request to publish
          */
-        if (state != MQTTSN_CONNECTED)
+        if (state != MQTTSN_PUBLISHING)
             sleepsecs = MQPUB_STATE_INTERVAL;
         else
             sleepsecs = MQTTSN_PUBLISH_INTERVAL;
@@ -319,7 +319,6 @@ again:
             printf("mqttsn_state: async\n");
             break;
         case MSG_EVT_PERIODIC:
-            printf("mqttsn_state: periodic\n");
             xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*1000000);
             break;
         default:
