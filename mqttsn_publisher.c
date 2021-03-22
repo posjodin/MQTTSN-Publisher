@@ -298,6 +298,8 @@ again:
                     goto again;
                 }
             } while (!finished);
+            mqpub_discon();
+            state = MQTTSN_NOT_CONNECTED;
         }
         break;
         default:
