@@ -298,6 +298,8 @@ again:
                     goto again;
                 }
             } while (!finished);
+            mqpub_discon();
+            state = MQTTSN_NOT_CONNECTED;
         }
         break;
         default:
@@ -306,7 +308,7 @@ again:
         /* Wait for something to happen -- periodic timer or async
          * request to publish
          */
-        if (state != MQTTSN_CONNECTED)
+        if (state != MQTTSN_PUBLISHING)
             sleepsecs = MQPUB_STATE_INTERVAL;
         else
             sleepsecs = MQTTSN_PUBLISH_INTERVAL;
