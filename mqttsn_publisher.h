@@ -7,6 +7,7 @@ typedef enum {
     MQTTSN_NOT_CONNECTED,
     MQTTSN_CONNECTED,
     MQTTSN_PUBLISHING,
+    MQTTSN_DISCONNECTED,
 } mqttsn_state_t;
 
 typedef struct mqttsn_stats {
@@ -44,7 +45,7 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #endif  /* MQTTSN_BUFFER_SIZE */
 
 #ifndef MQTTSN_PUBLISH_INTERVAL
-#define MQTTSN_PUBLISH_INTERVAL 30
+#define MQTTSN_PUBLISH_INTERVAL 120
 #endif /* MQTTSN_PUBLISH_INTERVAL */
 
 void mqttsn_publisher_init(void);
@@ -65,4 +66,8 @@ size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix);
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
 
 void mqpub_report_ready(void);
+
+int dns_resolve_inetaddr(char *host, ipv6_addr_t *result);
+
 #endif /* MQTTSN_PUBLISHER_T */
+

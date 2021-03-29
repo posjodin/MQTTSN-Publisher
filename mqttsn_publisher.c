@@ -26,6 +26,9 @@
 
 #include "mqttsn_publisher.h"
 #include "report.h"
+#ifdef SNTP_SYNC
+#include "sync_timestamp.h"
+#endif /* SNTP_SYNC */
 
 #ifdef BOARD_AVR_RSS2
 #include "pstr_print.h"
@@ -48,7 +51,7 @@
 mqttsn_stats_t mqttsn_stats;
 
 #ifdef MQTTSN_PUBLISHER_THREAD
-static char mqpub_stack[THREAD_STACKSIZE_DEFAULT];
+static char mqpub_stack[THREAD_STACKSIZE_DEFAULT + 128];
 #endif
 static char emcute_stack[2*THREAD_STACKSIZE_DEFAULT];
 
@@ -129,7 +132,7 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     
 }
 
-static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
+int dns_resolve_inetaddr(char *host, ipv6_addr_t *result) {
     /* Is host a v6 address? */
     if (ipv6_addr_from_str(result, host) != NULL) {
         return 0;
@@ -148,13 +151,17 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
     result->u16[4].u16 = 0;
     result->u16[5].u16 = 0xffff;
 
-    
+    printf("dns_resolve_inetaddr %s\n", host);
     int res;
-    res = sock_dns_query(MQTTSN_GATEWAY_HOST, &result->u32[3].u32, AF_INET);
+    res = sock_dns_query(host, &result->u32[3].u32, AF_INET);
     return res;
 #else
     return -1;
 #endif    
+}
+
+static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
+    return dns_resolve_inetaddr(host, result);
 }
 
 int mqpub_con(char *host, uint16_t port) {
@@ -162,7 +169,7 @@ int mqpub_con(char *host, uint16_t port) {
     int errno;
     
     /* parse address */
-    if ((errno = _resolve_v6addr(host, (ipv6_addr_t *) &gw.addr.ipv6)) < 0)
+    if ((errno = _resolve_v6addr(MQTTSN_GATEWAY_HOST, (ipv6_addr_t *) &gw.addr.ipv6)) < 0)
         return errno;
     printf("mqpub: Connect to [");
     ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
@@ -291,31 +298,42 @@ again:
         {
             static uint8_t finished;
             do {
+
                 publen = makereport(publish_buffer, sizeof(publish_buffer), &finished);
                 if (mqpub_pub(&topic, publish_buffer, publen) != 0) {
                     mqpub_reset();
                     state = MQTTSN_NOT_CONNECTED;
                     goto again;
                 }
+
             } while (!finished);
             mqpub_discon();
-            state = MQTTSN_NOT_CONNECTED;
+
+            state = MQTTSN_DISCONNECTED;
+            break;
         }
-        break;
+        case MQTTSN_DISCONNECTED:
+            state = MQTTSN_NOT_CONNECTED;
+            break;
         default:
             break;
         }
         /* Wait for something to happen -- periodic timer or async
          * request to publish
          */
-        if (state != MQTTSN_PUBLISHING)
-            sleepsecs = MQPUB_STATE_INTERVAL;
-        else
+        if (state == MQTTSN_PUBLISHING || state == MQTTSN_DISCONNECTED)
             sleepsecs = MQTTSN_PUBLISH_INTERVAL;
+        else
+            sleepsecs = MQPUB_STATE_INTERVAL;
         xtimer_set(&periodic_timer, sleepsecs*1000000);
+
+#ifdef SNTP_SYNC
+        sync_periodic(); 
+#endif /* SNTP_SYNC */
 
         msg_t msg;
         mbox_get(&evt_mbox, &msg);
+
         switch (msg.type) {
         case MSG_EVT_ASYNC:
             printf("mqttsn_state: async\n");
@@ -425,6 +443,8 @@ int mqttsn_stats_cmd(int argc, char **argv) {
           break;
       case MQTTSN_PUBLISHING:
           puts("publishing");
+      case MQTTSN_DISCONNECTED:
+          puts("disconnected");
     }
 #else
     puts("not started");
