@@ -83,6 +83,7 @@ int sim7020cmd_stats(int argc, char **argv) {
   printf("rx_bytes: %" PRIu32 "\n", ns->rx_bytes);
   printf("commfail_count: %" PRIu32 "\n", ns->commfail_count);
   printf("reset_count: %" PRIu32 "\n", ns->reset_count);
+  printf("activation_count: %" PRIu32 "\n", ns->activation_count);
   printf("activation_fail_count: %" PRIu32 "\n", ns->activation_fail_count);
   {
     extern uint32_t sim7020_activation_usecs;

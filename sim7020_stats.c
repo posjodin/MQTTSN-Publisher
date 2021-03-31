@@ -63,6 +63,7 @@ static int stats(char *str, size_t len, uint8_t *finished) {
         PUTFMT("{\"n\":\"rx\",\"u\":\"byte\",\"v\":%" PRIu32 "},", ns->rx_bytes);
         PUTFMT("{\"n\":\"commfail\",\"u\":\"count\",\"v\":%" PRIu32 "},", ns->commfail_count);
         PUTFMT("{\"n\":\"reset\",\"u\":\"count\",\"v\":%" PRIu32 "},", ns->reset_count);
+        PUTFMT("{\"n\":\"activation_success\",\"u\":\"count\",\"v\":%" PRIu32 "}", ns->activation_count);
         PUTFMT("{\"n\":\"activation_fail\",\"u\":\"count\",\"v\":%" PRIu32 "}", ns->activation_fail_count);
         PUTFMT("]}");
         RECORD_END(nread);
