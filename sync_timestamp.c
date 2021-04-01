@@ -1,28 +1,85 @@
-#ifdef MODULE_SNTP
 #include "timex.h"
+#ifdef MODULE_SNTP
 #include "net/sntp.h"
-
+#endif /* MODULE_SNTP */
 #ifdef MODULE_SIM7020
 #include "net/sim7020.h"
 #endif /* MODULE_SIM7020 */
-#include "sync_timestamp.h"
 #include "mqttsn_publisher.h"
+#include "sync_timestamp.h"
 
+#ifdef MODULE_SNTP
 static char *ntp_hosts[] = {"0.se.pool.ntp.org", "::ffff:5bd1:0014"};
 static char **current_ntp_hostp = NULL;
 
+/* 
+ * How long to wait for response from NTP server 
+ */
 #define SYNC_SNTP_TIMEOUT 20000000
+/*
+ * Number of failed attempts before switching to other NTP server
+ */
 #define SYNC_SNTP_MAXATTEMPTS 5
 
-/* Time between syncs */
+/*
+ * Time between sync refresh
+ */
 #define SYNC_INTERVAL_SECONDS 300
 
-/* For how long a sync is considered valid */
+/* 
+ * For how long a sync is considered valid 
+ */
 #define SYNC_VALID_SECONDS 24*60*1
-
-static int has_sync = 0;
-
+#endif /* MODULE_SNTP */
+/*
+ * Time of last sync 
+ */
 static timex_t last_sync;
+
+static timex_t basetime;
+
+void sync_init(void) {
+    xtimer_now_timex(&basetime);
+}
+
+/*
+ * Get current basetime
+ * Basetime is absolute unix time if there is a valid
+ * NTP synchronization, otherwise local clock time.
+ */
+uint64_t sync_basetime(void) {
+    uint64_t bt = timex_uint64(basetime);
+    if (sync_has_sync()) {
+        bt = sync_get_unix_ticks64(bt);
+        assert(SYNC_GLOBAL_TIMESTAMP(bt));    
+    }
+    else {
+        assert(!SYNC_GLOBAL_TIMESTAMP(bt));
+    }
+    return bt;
+}
+
+/*
+ * Get offset of a 64-bit timestamp relative to basetime
+ */
+uint64_t sync_basetime_offset(uint64_t timestamp) {
+    timex_t stamp, offset;
+    stamp = timex_from_uint64(timestamp);
+    if (timex_cmp(stamp, basetime) < 0) {
+        /* No negative offset */
+        return 0;
+    }
+    offset = timex_sub(stamp, basetime);
+    return timex_uint64(offset);
+}
+
+/*
+ * We have a valid synchronization. 
+ * Remember when this was
+ */
+static void sync_done(void) {
+    xtimer_now_timex(&last_sync);
+}
 
 /*
  * Do we have a valid sync?
@@ -89,8 +146,7 @@ void sync_periodic(void) {
         current_ntp_hostp = &ntp_hosts[0];
     int res = sync_with_server(*current_ntp_hostp);
     if (res == 0) {
-        xtimer_now_timex(&last_sync);
-        has_sync = 1;
+        sync_done();
         return;
     }
     else {
@@ -127,5 +183,3 @@ uint64_t sync_get_unix_usec(void) {
     uint32_t utime_msec = (ts/1000) % 1000;
     printf("UNix time: %" PRIu32 ".%03" PRIu32 " msec\n", utime_sec, utime_msec);
 }
-
-#endif /* MODULE_SNTP */

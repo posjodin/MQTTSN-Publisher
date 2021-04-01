@@ -14,6 +14,7 @@
 #include "net/emcute.h"
 #include "net/ipv6/addr.h"
 
+#include "sync_timestamp.h"
 #ifdef MODULE_MQTTSN_PUBLISHER
 #include "mqttsn_publisher.h"
 #endif
@@ -78,6 +79,7 @@ int main(void)
     ///* the main thread needs a msg queue to be able to run `ping6`*/
     msg_init_queue(_main_msg_queue, ARRAY_SIZE(_main_msg_queue));
 
+    sync_init();
 #ifdef AUTO_INIT_MQTTSN
     mqttsn_publisher_init();
 #endif /* AUTO_INIT_MQTTSN */
