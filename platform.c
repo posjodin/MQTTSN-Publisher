@@ -17,6 +17,32 @@
 #include "pstr_print.h"
 #endif
 
+extern uint8_t soft_rst __attribute__((section(".noinit")));
+
+static char * reset_cause(uint8_t reg)
+{
+    if (reg & (1 << PORF)) {
+        return("Power-on reset");
+    }
+    if (reg & (1 << EXTRF)) {
+        return("External reset");
+    }
+    if (reg & (1 << BORF)) {
+        return("Brownout reset");
+    }
+    if (reg & (1 << WDRF)) {
+        if (soft_rst & 0xAA) {
+            return("Software reset");
+        } else {
+            return("Watchdog reset");
+        }
+    }
+    if(reg & (1 << JTRF)) {
+        return("JTAG reset");
+    }
+    return "";
+}
+
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished) {
      char *s = (char *) buf;
      size_t l = len;
@@ -27,6 +53,7 @@ int boot_report(uint8_t *buf, size_t len, uint8_t *finished) {
      RECORD_START(s + nread, l - nread);
      PUTFMT(",{\"n\": \"boot;application\",\"vs\":\"" APPLICATION "\"}");
      PUTFMT(",{\"n\": \"boot;build\",\"vs\":\"RIOT %s\"}", RIOT_VERSION);
+     PUTFMT(",{\"n\": \"boot;reset_cause\",\"vs\":\"%s\"}", reset_cause(GPIOR0));
      RECORD_END(nread);
 
      *finished = 1;
