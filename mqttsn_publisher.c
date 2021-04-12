@@ -314,7 +314,7 @@ again:
         }
         case MQTTSN_DISCONNECTED:
             state = MQTTSN_NOT_CONNECTED;
-            break;
+            continue;
         default:
             break;
         }
@@ -339,6 +339,7 @@ again:
             printf("mqttsn_state: async\n");
             break;
         case MSG_EVT_PERIODIC:
+            printf("mqttsn_state: periodic\n");
             xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*1000000);
             break;
         default:
