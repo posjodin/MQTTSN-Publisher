@@ -164,12 +164,14 @@ static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
     return dns_resolve_inetaddr(host, result);
 }
 
+static char mqttsn_gateway_host[] = MQTTSN_GATEWAY_HOST;
+
 int mqpub_con(char *host, uint16_t port) {
-  sock_udp_ep_t gw = { .family = AF_INET6, .port = port /* MQTTSN_GATEWAY_PORT */ };
+    sock_udp_ep_t gw = { .family = AF_INET6, .port = port};
     int errno;
     
     /* parse address */
-    if ((errno = _resolve_v6addr(MQTTSN_GATEWAY_HOST, (ipv6_addr_t *) &gw.addr.ipv6)) < 0)
+    if ((errno = _resolve_v6addr(mqttsn_gateway_host, (ipv6_addr_t *) &gw.addr.ipv6)) < 0)
         return errno;
     printf("mqpub: Connect to [");
     ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
@@ -240,43 +242,33 @@ enum {
   MSG_EVT_PERIODIC,
 };
 
-static mbox_t evt_mbox;
+#define EVT_QUEUE_SIZE 4
+static msg_t evt_msg_queue[EVT_QUEUE_SIZE];
+static mbox_t evt_mbox = MBOX_INIT(evt_msg_queue, EVT_QUEUE_SIZE);
 
 static void _periodic_callback(void *arg)
 {
     msg_t msg = { .type = MSG_EVT_PERIODIC };
     mbox_t *mbox = arg;
-
-    /* should be safe, because otherwise if mbox were filled this callback is
-     * senseless */
-    mbox_try_put(mbox, &msg);
+    printf("PERIODIC CALLBACK\n");
+    mbox_put(mbox, &msg);
 }
 
 void mqpub_report_ready(void) {
     msg_t msg = { .type = MSG_EVT_ASYNC };
     mbox_t *mbox = &evt_mbox;
-
-    /* should be safe, because otherwise if mbox were filled this callback is
-     * senseless */
-    mbox_try_put(mbox, &msg);
+    mbox_put(mbox, &msg);
 }
 
-static mqttsn_state_t state;
+static mqttsn_state_t state = MQTTSN_NOT_CONNECTED;
 
-static void *mqpub_thread(void *arg)
-{
-    (void)arg;
-    uint32_t sleepsecs;
+static void _publish_all(void) {
     mqpub_topic_t topic;
     size_t publen;
     int res;
     xtimer_t periodic_timer;
 
 again:
-    periodic_timer.callback = _periodic_callback;
-    periodic_timer.arg = &evt_mbox;
-
-    state = MQTTSN_NOT_CONNECTED;
     while (1) {
         switch (state) {
         case MQTTSN_NOT_CONNECTED:
@@ -293,6 +285,8 @@ again:
                 break;
             }
             state = MQTTSN_PUBLISHING;
+            printf("%d: xtimer_set %d\n", __LINE__, MQTTSN_PUBLISH_INTERVAL);
+            xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*1000000);
             /* fall through */
         case MQTTSN_PUBLISHING:
         {
@@ -308,8 +302,8 @@ again:
 
             } while (!finished);
             mqpub_discon();
-
             state = MQTTSN_DISCONNECTED;
+            return;
             break;
         }
         case MQTTSN_DISCONNECTED:
@@ -318,15 +312,26 @@ again:
         default:
             break;
         }
-        /* Wait for something to happen -- periodic timer or async
-         * request to publish
+        /* End up here if not successful. 
+         * Wait a while and try again.
          */
-        if (state == MQTTSN_PUBLISHING || state == MQTTSN_DISCONNECTED)
-            sleepsecs = MQTTSN_PUBLISH_INTERVAL;
-        else
-            sleepsecs = MQPUB_STATE_INTERVAL;
-        xtimer_set(&periodic_timer, sleepsecs*1000000);
+        xtimer_sleep(MQPUB_STATE_INTERVAL);
+    }
+}
 
+
+static void *mqpub_thread(void *arg)
+{
+    (void)arg;
+    xtimer_t periodic_timer;
+
+    periodic_timer.callback = _periodic_callback;
+    periodic_timer.arg = &evt_mbox;
+    
+    xtimer_set(&periodic_timer, 1*US_PER_SEC);
+
+    state = MQTTSN_NOT_CONNECTED;
+    while (1) {
 #ifdef SNTP_SYNC
         sync_periodic(); 
 #endif /* SNTP_SYNC */
@@ -340,13 +345,15 @@ again:
             break;
         case MSG_EVT_PERIODIC:
             printf("mqttsn_state: periodic\n");
-            xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*1000000);
+            printf("%d: xtimer_set %" PRIu32 "\n", __LINE__, MQTTSN_PUBLISH_INTERVAL);
+            xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*US_PER_SEC);
             break;
         default:
             printf("mqttsn_state: bad type %d\n", msg.type);
         }
+        _publish_all();
     }
-    return NULL;    /* shouldn't happen */
+    return NULL;
 }
 #endif /* MQTTSN_PUBLISHER_THREAD */
 
