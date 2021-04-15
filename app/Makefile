@@ -5,8 +5,8 @@ APPLICATION = mqttsn_publisher
 BOARD ?= avr-rss2
 
 # This has to be the absolute path to the RIOT base directory:
-RIOTBASE ?= $(CURDIR)/../../RIOT-OS
-
+#RIOTBASE ?= $(CURDIR)/../../RIOT-OS
+RIOTBASE ?= /Users/psj/green-iot/RIOT/RIOT-OS
 
 # Network stack to use - sim7020 or gnrc
 NETSTACK ?= sim7020
@@ -36,6 +36,11 @@ CFLAFS += DMQTTSN_GATEWAY_PORT=10000
 
 USEMODULE += emcute
 CFLAGS += -DEMCUTE_ID=\"rpl-857b\"
+
+# Use SNTP for global timestamps
+USEMODULE += sntp
+USEMODULE += gnrc_netif
+USEMODULE += gnrc_netapi
 
 ifeq ($(NETSTACK), sim7020)
   USEMODULE += sim7020_sock_udp
