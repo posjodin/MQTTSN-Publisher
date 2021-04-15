@@ -5,7 +5,8 @@ APPLICATION = mqttsn_publisher
 BOARD ?= avr-rss2
 
 # This has to be the absolute path to the RIOT base directory:
-RIOTBASE ?= $(CURDIR)/../../RIOT-OS
+#RIOTBASE ?= $(CURDIR)/../../RIOT-OS
+RIOTBASE ?= $(CURDIR)/../../../../../../RIOT-OS/
 
 
 # Network stack to use - sim7020 or gnrc
@@ -23,6 +24,8 @@ CFLAGS += -DMQTTSN_PUBLISHER_THREAD
 CFLAGS += -DAUTO_INIT_MQTTSN
 # Use DNS to lookup host names
 USE_DNS ?= false
+# Use SNTP to syncrhonize clocks
+CFLAGS += -DSNTP_SYNC
 # MQTT-SN gateway
 # lxc-ha IPv6 static ULA:
 CFLAGS += -DMQTTSN_GATEWAY_HOST=\"fd95:9bba:768f:0:216:3eff:fec6:99db\" 
