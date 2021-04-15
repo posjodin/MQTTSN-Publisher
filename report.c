@@ -16,11 +16,12 @@
 
 #include "mqttsn_publisher.h"
 #include "report.h"
+#include "sync_timestamp.h"
 
 #ifdef EPCGW
 #include "../epcgw.h"
 #endif /* EPCGW */
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    (1)
 #include "debug.h"
 
 #ifdef BOARD_AVR_RSS2
@@ -53,8 +54,13 @@ static size_t preamble(uint8_t *buf, size_t len) {
      n = get_nodeid(RECORD_STR(), RECORD_LEN());
      RECORD_ADD(n);
      PUTFMT(";\"");
-     PUTFMT(",\"bu\":\"count\",\"bt\":%lu}", (uint32_t) (xtimer_now_usec()/1000000));
-     PUTFMT(",{\"n\":\"seq_no\",\"u\":\"count\",\"v\":%d}", 9000+seq_nr_value++);
+
+     uint64_t basetime = sync_basetime();
+     uint32_t utime_sec = basetime/1000000;
+     uint32_t utime_msec = (basetime/1000) % 1000;
+     PUTFMT(",\"bt\":%" PRIu32 ".%03" PRIu32 "}", utime_sec, utime_msec);
+
+     PUTFMT(",{\"n\":\"seq_no\",\"v\":%d}", 9000+seq_nr_value++);
      RECORD_END(nread);
 
      return (nread);
@@ -92,8 +98,8 @@ report_gen_t next_report_gen(void) {
 #endif /* EPCGW */
 
      if (done_once == 0) {
-       return(boot_report);
        done_once = 1;
+       return(boot_report);
      }
 
      switch (reportno++ % s_max_report) {
