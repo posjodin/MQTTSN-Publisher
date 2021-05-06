@@ -16,11 +16,12 @@
 
 #include "mqttsn_publisher.h"
 #include "report.h"
+#include "sync_timestamp.h"
 
 #ifdef EPCGW
 #include "../epcgw.h"
 #endif /* EPCGW */
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    (1)
 #include "debug.h"
 
 #ifdef BOARD_AVR_RSS2
@@ -35,6 +36,10 @@ int rpl_report(uint8_t *buf, size_t len, uint8_t *finished);
 #if defined(MODULE_SIM7020)
 int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished);
 #endif
+#ifdef EPCGW
+int epcgwstats_report(uint8_t *buf, size_t len, uint8_t *finished);
+#endif /* EPCGW */
+
 int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished);
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished);
 
@@ -49,8 +54,13 @@ static size_t preamble(uint8_t *buf, size_t len) {
      n = get_nodeid(RECORD_STR(), RECORD_LEN());
      RECORD_ADD(n);
      PUTFMT(";\"");
-     PUTFMT(",\"bu\":\"count\",\"bt\":%lu}", (uint32_t) (xtimer_now_usec()/1000000));
-     PUTFMT(",{\"n\":\"seq_no\",\"u\":\"count\",\"v\":%d}", 9000+seq_nr_value++);
+
+     uint64_t basetime = sync_basetime();
+     uint32_t utime_sec = basetime/1000000;
+     uint32_t utime_msec = (basetime/1000) % 1000;
+     PUTFMT(",\"bt\":%" PRIu32 ".%03" PRIu32 "}", utime_sec, utime_msec);
+
+     PUTFMT(",{\"n\":\"seq_no\",\"v\":%d}", 9000+seq_nr_value++);
      RECORD_END(nread);
 
      return (nread);
@@ -67,15 +77,16 @@ typedef enum {
 #if defined(MODULE_SIM7020)
   s_sim7020_report,
 #endif
+#if defined(EPCGW)
+  s_epcgwstats_report,
+#endif
   s_mqttsn_report,
   s_max_report
 } report_state_t;
 
 report_gen_t next_report_gen(void) {
      static unsigned int reportno = 0;
-
-     if (reportno++ == 0)
-       return(boot_report);
+     static uint8_t done_once = 0;
 
 #ifdef EPCGW
      /* EPC reports have priority. If there is an epc report
@@ -86,7 +97,12 @@ report_gen_t next_report_gen(void) {
          return epcgen;
 #endif /* EPCGW */
 
-     switch (reportno % s_max_report) {
+     if (done_once == 0) {
+       done_once = 1;
+       return(boot_report);
+     }
+
+     switch (reportno++ % s_max_report) {
 #if defined(MODULE_GNRC_RPL)
      case s_rpl_report:
           return(rpl_report);
@@ -94,6 +110,10 @@ report_gen_t next_report_gen(void) {
 #if defined(MODULE_SIM7020)
      case s_sim7020_report:
           return(sim7020_report);
+#endif
+#if defined(EPCGW)
+     case s_epcgwstats_report:
+         return epcgwstats_report;
 #endif
      case s_mqttsn_report:
           return(mqttsn_report);
@@ -115,6 +135,10 @@ static char *reportfunstr(report_gen_t fun) {
 #if defined(MODULE_SIM7020)
   else if (fun == sim7020_report)
     return("sim7020");
+#endif
+#if defined(EPCGW)
+  else if (fun == epcgwstats_report)
+    return("epcgwstats");
 #endif
   else if (fun == mqttsn_report)
     return("mqttsn");

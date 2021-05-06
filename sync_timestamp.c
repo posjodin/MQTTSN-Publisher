@@ -3,6 +3,7 @@
 #include "net/sntp.h"
 #endif /* MODULE_SNTP */
 #ifdef MODULE_SIM7020
+#include "net/sock/udp.h"
 #include "net/sim7020.h"
 #endif /* MODULE_SIM7020 */
 #include "mqttsn_publisher.h"
@@ -30,11 +31,11 @@ static char **current_ntp_hostp = NULL;
  * For how long a sync is considered valid 
  */
 #define SYNC_VALID_SECONDS 24*60*1
-#endif /* MODULE_SNTP */
 /*
  * Time of last sync 
  */
 static timex_t last_sync;
+#endif /* MODULE_SNTP */
 
 static timex_t basetime;
 
@@ -72,6 +73,8 @@ uint64_t sync_basetime_offset(uint64_t timestamp) {
     offset = timex_sub(stamp, basetime);
     return timex_uint64(offset);
 }
+
+#ifdef MODULE_SNTP
 
 /*
  * We have a valid synchronization. 
@@ -183,3 +186,15 @@ uint64_t sync_get_unix_usec(void) {
     uint32_t utime_msec = (ts/1000) % 1000;
     printf("UNix time: %" PRIu32 ".%03" PRIu32 " msec\n", utime_sec, utime_msec);
 }
+#else
+/*
+ * Periodic sync – nothing to do
+ */
+void sync_periodic(void) {
+    return;
+}
+
+int sync_has_sync(void) {
+    return 0;
+}
+#endif /* MODULE_SNTP */
