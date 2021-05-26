@@ -55,7 +55,7 @@ static char mqpub_stack[THREAD_STACKSIZE_DEFAULT + 128];
 #endif
 static char emcute_stack[2*THREAD_STACKSIZE_DEFAULT];
 
-static char topicstr[MQPUB_TOPIC_LENGTH];
+static char default_topicstr[MQPUB_TOPIC_LENGTH];
 emcute_topic_t emcute_topic;
 
 static int client_id(char *id, int idlen, char *prefix) {
@@ -90,13 +90,50 @@ int get_nodeid(char *buf, size_t size) {
     return n;
 }
 
-static void _init_topic(void) {
+static mqpub_topic_t mqpub_topics[MQTTSN_MAX_TOPICS];
+
+static inline void _reset_topic(mqpub_topic_t *topic) {
+    topic->name = NULL;
+}
+
+static void _init_topics(void) {
+    mqpub_topic_t *topic, *last;
+
+    last = &mqpub_topics[MQTTSN_MAX_TOPICS-1];
+    for (topic = mqpub_topics; topic < last; topic++)
+        _reset_topic(topic);
+}
+
+static mqpub_topic_t *_alloc_topic(const char *topicstr) {
+    mqpub_topic_t *topic, *last;
+
+    last = &mqpub_topics[MQTTSN_MAX_TOPICS-1];
+    for (topic = mqpub_topics; topic < last; topic++)
+        if (topic->name == NULL) {
+            topic->name = topicstr;
+            return topic;
+        }
+    return NULL;
+}
+
+static mqpub_topic_t *_lookup_topic(const char *topicstr) {
+    mqpub_topic_t *topic, *last;
+
+    last = &mqpub_topics[MQTTSN_MAX_TOPICS-1];
+    for (topic = mqpub_topics; topic < last; topic++)
+        if (topic->name != NULL && 
+            strncmp(topic->name, topicstr, sizeof(topic->name)) == 0)
+            return topic;
+    return NULL;
+}
+
+static void _init_default_topicstr(void) {
   
     int n; 
 
-    n = snprintf(topicstr, sizeof(topicstr), "%s/", MQTT_TOPIC_BASE);
-    n += get_nodeid(topicstr + n, sizeof(topicstr) - n);
-    n += snprintf(topicstr + n, sizeof(topicstr) - n, "/sensors");
+    n = snprintf(default_topicstr, sizeof(default_topicstr), "%s/", MQTT_TOPIC_BASE);
+    n += get_nodeid(default_topicstr + n, sizeof(default_topicstr) - n);
+    n += snprintf(default_topicstr + n, sizeof(default_topicstr) - n, "/sensors");
 }
 
 size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix) {
@@ -113,6 +150,9 @@ size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix) {
     return n;
 }
 
+void mqpub_init(void) {
+    _init_topics();
+}
 
 uint8_t publish_buffer[MQTTSN_BUFFER_SIZE];
 
@@ -200,6 +240,26 @@ int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
     return 0;
 }
 
+mqpub_topic_t *mqpub_reg_topic(char *topicstr) {
+    mqpub_topic_t *tp;
+    int errno;
+    if ((tp = _lookup_topic(topicstr)) != NULL)
+        return tp;
+    if ((tp = _alloc_topic(topicstr)) == NULL) {
+        return NULL;
+    }
+    printf("mqpub: register %s\n", tp->name);
+    if ((errno = emcute_reg((emcute_topic_t *) tp)) != EMCUTE_OK) {
+        mqttsn_stats.register_fail += 1;
+        printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", tp->name, errno);
+        _reset_topic(tp);
+        return NULL;
+    }
+    printf("Register topic %d for \"%s\"\n", (int)tp->id, tp->name);
+    mqttsn_stats.register_ok += 1;
+    return tp;
+}
+
 int mqpub_discon(void) {
     return emcute_discon();
 }
@@ -263,38 +323,39 @@ void mqpub_report_ready(void) {
 static mqttsn_state_t state = MQTTSN_NOT_CONNECTED;
 
 static void _publish_all(void) {
-    mqpub_topic_t topic;
-    size_t publen;
-    int res;
-    xtimer_t periodic_timer;
 
 again:
     while (1) {
         switch (state) {
         case MQTTSN_NOT_CONNECTED:
-            res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+            mqpub_init();
+            int res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
             //printf("mqpub_connect: %d\n", res);
             if (res != 0)
                 break;
             state = MQTTSN_CONNECTED;
             /* fall through */
         case MQTTSN_CONNECTED:
-            if (mqpub_reg(&topic, topicstr) != 0) {
-                mqpub_reset();
-                state = MQTTSN_NOT_CONNECTED;
-                break;
-            }
+            /* Now we check for each publish if the topic needs
+             * registration, so nothing to do here anymore.
+             */
             state = MQTTSN_PUBLISHING;
-            printf("%d: xtimer_set %d\n", __LINE__, MQTTSN_PUBLISH_INTERVAL);
-            xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*1000000);
             /* fall through */
         case MQTTSN_PUBLISHING:
         {
             static uint8_t finished;
             do {
+                size_t publen;
+                mqpub_topic_t *tp;
+                char *topicstr = default_topicstr;
 
-                publen = makereport(publish_buffer, sizeof(publish_buffer), &finished);
-                if (mqpub_pub(&topic, publish_buffer, publen) != 0) {
+                publen = makereport(publish_buffer, sizeof(publish_buffer), &finished, &topicstr);
+                if ((tp = mqpub_reg_topic(topicstr)) == NULL) {
+                    mqpub_reset();
+                    state = MQTTSN_NOT_CONNECTED;
+                    goto again;
+                }
+                if (mqpub_pub(tp, publish_buffer, publen) != 0) {
                     mqpub_reset();
                     state = MQTTSN_NOT_CONNECTED;
                     goto again;
@@ -366,7 +427,7 @@ kernel_pid_t mqpub_pid;
 
 void mqttsn_publisher_init(void) {
 
-    _init_topic();
+    _init_default_topicstr();
 
     /* start emcute thread */
     emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,
@@ -384,7 +445,7 @@ void mqttsn_publisher_init(void) {
 typedef enum {
     s_gateway, s_connect, s_register, s_publish, s_reset} mqttsn_report_state_t;
 
-int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished) {
+int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished, __attribute__((unused)) char **topicstr) {
      char *s = (char *) buf;
      size_t l = len;
      static mqttsn_report_state_t state = s_gateway;

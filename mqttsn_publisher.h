@@ -33,7 +33,8 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #endif
 
 #ifndef MQTTSN_GATEWAY_HOST
-#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
+#define  MQTTSN_GATEWAY_HOST "::ffff:c010:7de8"
+//#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
 #endif /* MQTTSN_GATEWAY_HOST */
 #ifndef MQTTSN_GATEWAY_PORT
 //#define MQTTSN_GATEWAY_PORT 1884
@@ -49,11 +50,16 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #define MQTTSN_PUBLISH_INTERVAL 600 //1200
 #endif /* MQTTSN_PUBLISH_INTERVAL */
 
+#ifndef MQTTSN_MAX_TOPICS
+/* Max no of topics during a connection  */
+#define MQTTSN_MAX_TOPICS 8
+#endif /* MQTTSN_MAX_TOPICS */
+
 void mqttsn_publisher_init(void);
 
 int get_nodeid(char *buf, size_t size);
 
-size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished);
+size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished, char **topicstr);
 
 int mqttsn_stats_cmd(int argc, char **argv);
 

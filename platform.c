@@ -40,10 +40,14 @@ static char * reset_cause(uint8_t reg)
     if(reg & (1 << JTRF)) {
         return("JTAG reset");
     }
-    return "";
+    {
+      static char cause[sizeof("0xff")];
+      snprintf(cause, sizeof(cause), "0x%02" PRIx8, reg);
+      return cause;
+    }
 }
 
-int boot_report(uint8_t *buf, size_t len, uint8_t *finished) {
+int boot_report(uint8_t *buf, size_t len, uint8_t *finished, __attribute__((unused)) char **topicstr) {
      char *s = (char *) buf;
      size_t l = len;
      int nread = 0;

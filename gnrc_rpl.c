@@ -190,7 +190,7 @@ static int parents(char *str, size_t len) {
 
 typedef enum {s_instances, s_dags, s_parents, s_stats} rpl_state_t;
 
-int rpl_report(uint8_t *buf, size_t len, uint8_t *finished) {
+int rpl_report(uint8_t *buf, size_t len, uint8_t *finished, __attribute__((unused)) char **topicstr) {
      char *s = (char *) buf;
      size_t l = len;
      int nread = 0, n;

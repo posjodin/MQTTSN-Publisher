@@ -84,6 +84,9 @@
  * Return the number of bytes written (zero if the report did not fit).
  * Upon return, *finished is set to 0 if there are more reports that
  * should be sent, but did not fit. Otherwise *finished is set to 1.
+ * topicstrp is a pointer to a topic string. The report generator
+ * can use it to set the topic for each report. The topic string is
+ * initialized to a default topic.
  */
-typedef int (* report_gen_t)(uint8_t *buf, size_t len, uint8_t *finished);
+typedef int (* report_gen_t)(uint8_t *buf, size_t len, uint8_t *finished, char **topicstrp);
 
