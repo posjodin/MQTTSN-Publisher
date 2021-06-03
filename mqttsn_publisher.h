@@ -27,6 +27,9 @@ typedef emcute_topic_t mqpub_topic_t;
 void mqttsn_publisher_init(void);
 mqttsn_state_t mqttsn_publisher_state(void);
 
+#ifndef MQPUB_TOPIC_LENGTH
+#define MQPUB_TOPIC_LENGTH  (64U)
+#endif /* MQPUB_TOPIC_LENGTH */
 
 #ifndef MQTT_TOPIC_BASE
 #define MQTT_TOPIC_BASE "KTH/avr-rss2"
@@ -68,7 +71,7 @@ int mqpub_con(char *host, uint16_t port);
 int mqpub_reg(mqpub_topic_t *topic, char *topicstr);
 int mqpub_discon(void);
 int mqpub_reset(void);
-size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix);
+size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix);
 
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
 

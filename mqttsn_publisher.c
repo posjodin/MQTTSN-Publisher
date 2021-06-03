@@ -39,9 +39,6 @@
 #define MQPUB_PRIO         (THREAD_PRIORITY_MAIN + 1)
 
 #define NUMOFSUBS           (16U)
-#define TOPIC_MAXLEN        (64U)
-
-#define MQPUB_TOPIC_LENGTH  64
 
 /* State machine interval in secs */
 #define MQPUB_STATE_INTERVAL 2
@@ -127,27 +124,24 @@ static mqpub_topic_t *_lookup_topic(const char *topicstr) {
     return NULL;
 }
 
-static void _init_default_topicstr(void) {
-  
-    int n; 
 
-    n = snprintf(default_topicstr, sizeof(default_topicstr), "%s/", MQTT_TOPIC_BASE);
-    n += get_nodeid(default_topicstr + n, sizeof(default_topicstr) - n);
-    n += snprintf(default_topicstr + n, sizeof(default_topicstr) - n, "/sensors");
-}
-
-size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix) {
-  
+size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix) {
     char *buf = topic;
     size_t len = topiclen;
     int n;
     
-    n = snprintf(buf, len, "%s/", MQTT_TOPIC_BASE);
-    n += get_nodeid(buf + n, len - n);
+    printf("INIT topic len %d: nodeid '%s' suffix '%s'\n", topiclen, nodeid, suffix);
+    n = snprintf(buf, len, "%s/%s", MQTT_TOPIC_BASE, nodeid);
     if (suffix != NULL) {
-        n = strlcat(buf, suffix, len - n);
+        n = strlcat(buf, suffix, len);
     }
     return n;
+}
+
+static void _init_default_topicstr(void) {
+    char nodeidstr[20];
+    (void) get_nodeid(nodeidstr, sizeof(nodeidstr));
+    mqpub_init_topic(default_topicstr, sizeof(default_topicstr), nodeidstr, "/sensors");
 }
 
 void mqpub_init(void) {
