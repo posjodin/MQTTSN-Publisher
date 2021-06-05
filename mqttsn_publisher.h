@@ -35,6 +35,14 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #define MQTT_TOPIC_BASE "KTH/avr-rss2"
 #endif
 
+#ifndef MQPUB_BASENAME_LENGTH
+#define MQPUB_BASENAME_LENGTH  (32U)
+#endif /* MQPUB_BASENAME_LENGTH */
+
+#ifndef MQPUB_BASENAME_FMT
+#define MQPUB_BASENAME_FMT "urn:dev:mac:%s"
+#endif /* MQPUB_BASENAME_FMT */
+
 #ifndef MQTTSN_GATEWAY_HOST
 #define  MQTTSN_GATEWAY_HOST "::ffff:c010:7de8"
 //#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
@@ -62,8 +70,6 @@ void mqttsn_publisher_init(void);
 
 int get_nodeid(char *buf, size_t size);
 
-size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished, char **topicstr);
-
 int mqttsn_stats_cmd(int argc, char **argv);
 
 int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len);
@@ -72,6 +78,7 @@ int mqpub_reg(mqpub_topic_t *topic, char *topicstr);
 int mqpub_discon(void);
 int mqpub_reset(void);
 size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix);
+size_t mqpub_init_basename(char *basename, size_t basenamelen, char *nodeid);
 
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
 

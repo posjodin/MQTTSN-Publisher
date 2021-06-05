@@ -104,7 +104,8 @@ static int stats(char *str, size_t len, uint8_t *finished) {
 
 typedef enum {s_stats} sim7020_state_t;
 
-int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished, __attribute__((unused)) char **topicstr) {
+int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished, 
+                   __attribute__((unused)) char **topicp, __attribute__((unused)) char **basenamep) {
     char *s = (char *) buf;
     size_t l = len;
     int nread = 0, n;

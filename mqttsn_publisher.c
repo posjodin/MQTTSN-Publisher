@@ -53,6 +53,7 @@ static char mqpub_stack[THREAD_STACKSIZE_DEFAULT + 128];
 static char emcute_stack[2*THREAD_STACKSIZE_DEFAULT];
 
 static char default_topicstr[MQPUB_TOPIC_LENGTH];
+static char default_basename[MQPUB_BASENAME_LENGTH];
 emcute_topic_t emcute_topic;
 
 static int client_id(char *id, int idlen, char *prefix) {
@@ -142,6 +143,22 @@ static void _init_default_topicstr(void) {
     char nodeidstr[20];
     (void) get_nodeid(nodeidstr, sizeof(nodeidstr));
     mqpub_init_topic(default_topicstr, sizeof(default_topicstr), nodeidstr, "/sensors");
+}
+
+size_t mqpub_init_basename(char *basename, size_t basenamelen, char *nodeid) {
+    char *buf = basename;
+    size_t len = basenamelen;
+    int n;
+    
+    printf("INIT basename len %d: nodeid '%s''\n", len, nodeid);
+    n = snprintf(buf, len, MQPUB_BASENAME_FMT, nodeid);
+    return n;
+}
+
+static void _init_default_basename(void) {
+    char nodeidstr[20];
+    (void) get_nodeid(nodeidstr, sizeof(nodeidstr));
+    (void) mqpub_init_basename(default_basename, sizeof(default_basename), nodeidstr);
 }
 
 void mqpub_init(void) {
@@ -342,8 +359,9 @@ again:
                 size_t publen;
                 mqpub_topic_t *tp;
                 char *topicstr = default_topicstr;
+                char *basename = default_basename;
 
-                publen = makereport(publish_buffer, sizeof(publish_buffer), &finished, &topicstr);
+                publen = makereport(publish_buffer, sizeof(publish_buffer), &finished, &topicstr, &basename);
                 if ((tp = mqpub_reg_topic(topicstr)) == NULL) {
                     mqpub_reset();
                     state = MQTTSN_NOT_CONNECTED;
@@ -422,6 +440,7 @@ kernel_pid_t mqpub_pid;
 void mqttsn_publisher_init(void) {
 
     _init_default_topicstr();
+    _init_default_basename();
 
     /* start emcute thread */
     emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,
@@ -439,7 +458,8 @@ void mqttsn_publisher_init(void) {
 typedef enum {
     s_gateway, s_connect, s_register, s_publish, s_reset} mqttsn_report_state_t;
 
-int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished, __attribute__((unused)) char **topicstr) {
+int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished, 
+                  __attribute__((unused)) char **topicp, __attribute__((unused)) char **basenamep) {
      char *s = (char *) buf;
      size_t l = len;
      static mqttsn_report_state_t state = s_gateway;

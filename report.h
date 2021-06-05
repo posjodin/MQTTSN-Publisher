@@ -17,8 +17,8 @@
 #include "pstr_print.h" 
 #endif
 
-//#define WARN printf
-#define WARN(...)
+#define WARN printf
+//#define WARN(...)
 
 /*
  * Mark start of a record. 
@@ -88,5 +88,7 @@
  * can use it to set the topic for each report. The topic string is
  * initialized to a default topic.
  */
-typedef int (* report_gen_t)(uint8_t *buf, size_t len, uint8_t *finished, char **topicstrp);
+typedef int (* report_gen_t)(uint8_t *buf, size_t len, uint8_t *finished, char **topicsp, char **basenamep);
+
+size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 

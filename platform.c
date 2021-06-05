@@ -47,7 +47,8 @@ static char * reset_cause(uint8_t reg)
     }
 }
 
-int boot_report(uint8_t *buf, size_t len, uint8_t *finished, __attribute__((unused)) char **topicstr) {
+int boot_report(uint8_t *buf, size_t len, uint8_t *finished, 
+                __attribute__((unused)) char **topicp, __attribute__((unused)) char **basenamep) {
      char *s = (char *) buf;
      size_t l = len;
      int nread = 0;
