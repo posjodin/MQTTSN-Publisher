@@ -44,8 +44,8 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #endif /* MQPUB_BASENAME_FMT */
 
 #ifndef MQTTSN_GATEWAY_HOST
-#define  MQTTSN_GATEWAY_HOST "::ffff:c010:7de8"
-//#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
+//#define  MQTTSN_GATEWAY_HOST "::ffff:c010:7de8"
+#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
 #endif /* MQTTSN_GATEWAY_HOST */
 #ifndef MQTTSN_GATEWAY_PORT
 //#define MQTTSN_GATEWAY_PORT 1884

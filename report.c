@@ -174,16 +174,13 @@ static size_t reports(uint8_t *buf, size_t len, uint8_t *finished, char **topicp
      size_t l = len;
      size_t nread = 0;
      static report_gen_t reportfun = NULL;
-     //static uint8_t finished;
 
      if (reportfun == NULL) {
           reportfun = next_report_gen();
      }
-     /* Let reportfun set basename, if it wants */
+     /* Call reportfun with null buffer to set basename first */
      (void) reportfun(NULL, 0, finished, topicp, basenamep);
      
-     if (basenamep)
-         printf("Make reports with basename %s\n", *basenamep);
      int n = preamble((uint8_t *) s + nread, l - nread, *basenamep); /* Save one for last bracket */
      if (n == 0)
          return (nread);

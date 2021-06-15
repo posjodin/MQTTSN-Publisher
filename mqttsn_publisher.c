@@ -29,6 +29,7 @@
 #ifdef SNTP_SYNC
 #include "sync_timestamp.h"
 #endif /* SNTP_SYNC */
+#include "dns_resolve.h"
 
 #ifdef BOARD_AVR_RSS2
 #include "pstr_print.h"
@@ -181,34 +182,6 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     mqttsn_stats.publish_ok += 1;
     return 0;
     
-}
-
-int dns_resolve_inetaddr(char *host, ipv6_addr_t *result) {
-    /* Is host a v6 address? */
-    if (ipv6_addr_from_str(result, host) != NULL) {
-        return 0;
-    }
-    
-#if defined(MODULE_SOCK_DNS) || defined(MODULE_SIM7020_SOCK_DNS) 
-#ifdef DNS_RESOLVER
-    sock_dns_server.family = AF_INET6;
-    sock_dns_server.port = 53;    
-    if (ipv6_addr_from_str((ipv6_addr_t *)&sock_dns_server.addr.ipv6, DNS_RESOLVER) == NULL) {
-         printf("Bad resolver address %s\n", DNS_RESOLVER);
-         return -1;
-    }
-#endif /* DNS_RESOLVER */
-    result->u64[0].u64 = 0;
-    result->u16[4].u16 = 0;
-    result->u16[5].u16 = 0xffff;
-
-    printf("dns_resolve_inetaddr %s\n", host);
-    int res;
-    res = sock_dns_query(host, &result->u32[3].u32, AF_INET);
-    return res;
-#else
-    return -1;
-#endif    
 }
 
 static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
@@ -405,10 +378,6 @@ static void *mqpub_thread(void *arg)
 
     state = MQTTSN_NOT_CONNECTED;
     while (1) {
-#ifdef SNTP_SYNC
-        sync_periodic(); 
-#endif /* SNTP_SYNC */
-
         msg_t msg;
         mbox_get(&evt_mbox, &msg);
 
@@ -417,8 +386,12 @@ static void *mqpub_thread(void *arg)
             printf("mqttsn_state: async\n");
             break;
         case MSG_EVT_PERIODIC:
-            printf("mqttsn_state: periodic\n");
-            printf("%d: xtimer_set %" PRIu32 "\n", __LINE__, MQTTSN_PUBLISH_INTERVAL);
+#ifdef SNTP_SYNC
+            sync_periodic();
+#endif /* SNTP_SYNC */
+#ifdef DNS_CACHE_REFRESH
+            dns_resolve_refresh();
+#endif /* DNS_CACHE_REFRESH */
             xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*US_PER_SEC);
             break;
         default:
@@ -441,6 +414,7 @@ void mqttsn_publisher_init(void) {
 
     _init_default_topicstr();
     _init_default_basename();
+    dns_resolve_init();
 
     /* start emcute thread */
     emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,
