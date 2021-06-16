@@ -18,6 +18,7 @@ typedef struct mqttsn_stats {
   uint16_t register_fail;
   uint16_t publish_fail;
   uint16_t reset;
+  uint16_t commreset;  
 } mqttsn_stats_t;
 
 extern mqttsn_stats_t mqttsn_stats;

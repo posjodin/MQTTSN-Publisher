@@ -30,6 +30,7 @@
 #include "sync_timestamp.h"
 #endif /* SNTP_SYNC */
 #include "dns_resolve.h"
+#include "watchdog.h"
 
 #ifdef BOARD_AVR_RSS2
 #include "pstr_print.h"
@@ -177,8 +178,10 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
         printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
                topic->name, (int)topic->id, errno);
         mqttsn_stats.publish_fail += 1;
+        watchdog_fail();
         return errno;
     }
+    watchdog_update();
     mqttsn_stats.publish_ok += 1;
     return 0;
     
@@ -203,10 +206,12 @@ int mqpub_con(char *host, uint16_t port) {
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
          printf("error: unable to connect to gateway [%s]:%d (error %d)\n", host, port, errno);
         mqttsn_stats.connect_fail += 1;
+        watchdog_fail();
         return 1;
     }
     printf("MQTT-SN: Connect to gateway [%s]:%d\n", host, port);
     mqttsn_stats.connect_ok += 1;
+    watchdog_update();
     return 0;
 }
 
@@ -217,9 +222,11 @@ int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
     if ((errno = emcute_reg((emcute_topic_t *) topic)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", topicstr, errno);
+        watchdog_fail();
         return 1;
     }
     printf("Register topic %d for \"%s\"\n", (int)topic->id, topicstr);
+    watchdog_update();
     mqttsn_stats.register_ok += 1;
     return 0;
 }
@@ -237,10 +244,12 @@ mqpub_topic_t *mqpub_reg_topic(char *topicstr) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", tp->name, errno);
         _reset_topic(tp);
+        watchdog_fail();
         return NULL;
     }
     printf("Register topic %d for \"%s\"\n", (int)tp->id, tp->name);
     mqttsn_stats.register_ok += 1;
+    watchdog_update();
     return tp;
 }
 
@@ -419,8 +428,6 @@ void mqttsn_publisher_init(void) {
     /* start emcute thread */
     emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,
                                emcute_thread, NULL, "emcute");
-    printf("Start emcute: pid %d\n", emcute_pid);
-    (void) emcute_thread; (void) emcute_stack;
 #ifdef MQTTSN_PUBLISHER_THREAD
     /* start publisher thread */
     mqpub_pid = thread_create(mqpub_stack, sizeof(mqpub_stack), MQPUB_PRIO, THREAD_CREATE_STACKTEST,
@@ -478,6 +485,7 @@ int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished,
      case s_reset:
           RECORD_START(s + nread, l - nread);
           PUTFMT(",{\"n\":\"mqtt_sn;stats;reset\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.reset);
+          PUTFMT(",{\"n\":\"mqtt_sn;stats;commreset\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.commreset);
           RECORD_END(nread);
 
           state = s_gateway;
@@ -513,5 +521,6 @@ int mqttsn_stats_cmd(int argc, char **argv) {
     printf("  register: success %d, fail %d\n", st->register_ok, st->register_fail);
     printf("  publish: success %d, fail %d\n", st->publish_ok, st->publish_fail);
     printf("  reset: %d\n", st->reset);
+    printf("  commreset: %d\n", st->commreset);
     return 0;
 }

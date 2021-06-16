@@ -13,7 +13,7 @@
 #ifdef BOARD_AVR_RSS2
 #include "pstr_print.h"
 #endif
-
+#include "watchdog.h"
 #include "dns_resolve.h"
 
 #define MAX_HOSTNAME_LENGTH 64
@@ -75,6 +75,7 @@ static int _resolve_inetaddr(char *host, ipv6_addr_t *result) {
 
     int res = sock_dns_query(host, &result->u32[3].u32, AF_INET);
     if (res >= 0) {
+        watchdog_update();
         /* Cache result */
         dns_cache_t *cache_entry = cache_lookup(host);
         if (cache_entry == NULL)
@@ -85,6 +86,8 @@ static int _resolve_inetaddr(char *host, ipv6_addr_t *result) {
             cache_entry->state = RESOLVED;
             cache_entry->time_usec = xtimer_now_usec();
         }
+    } else {
+        watchdog_fail();
     }
     return res;
 #else
