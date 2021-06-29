@@ -133,7 +133,6 @@ size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix
     size_t len = topiclen;
     int n;
     
-    printf("INIT topic len %d: nodeid '%s' suffix '%s'\n", topiclen, nodeid, suffix);
     n = snprintf(buf, len, "%s/%s", MQTT_TOPIC_BASE, nodeid);
     if (suffix != NULL) {
         n = strlcat(buf, suffix, len);
@@ -152,7 +151,6 @@ size_t mqpub_init_basename(char *basename, size_t basenamelen, char *nodeid) {
     size_t len = basenamelen;
     int n;
     
-    printf("INIT basename len %d: nodeid '%s''\n", len, nodeid);
     n = snprintf(buf, len, MQPUB_BASENAME_FMT, nodeid);
     return n;
 }
@@ -173,7 +171,8 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     unsigned flags = EMCUTE_QOS_1;
     int errno;
     
-    printf("mqpub: publish  %d to %s: \"%s\"\n", len, topic->name, (char *) data);
+    //printf("mqpub: publish  %d to %s: \"%s\"\n", len, topic->name, (char *) data);
+    printf("mqpub: publish  %d to topic %u\n", len, topic->id);
     if ((errno = emcute_pub((emcute_topic_t *) topic, data, len, flags)) != EMCUTE_OK) {
         printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
                topic->name, (int)topic->id, errno);
@@ -209,7 +208,7 @@ int mqpub_con(char *host, uint16_t port) {
         watchdog_fail();
         return 1;
     }
-    printf("MQTT-SN: Connect to gateway [%s]:%d\n", host, port);
+    printf("MQTT-SN: Connect to [%s]:%d\n", host, port);
     mqttsn_stats.connect_ok += 1;
     watchdog_update();
     return 0;
@@ -218,7 +217,6 @@ int mqpub_con(char *host, uint16_t port) {
 int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
     int errno;
     topic->name = topicstr;
-    printf("mqpub: register %s\n", topic->name);
     if ((errno = emcute_reg((emcute_topic_t *) topic)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", topicstr, errno);
@@ -392,7 +390,6 @@ static void *mqpub_thread(void *arg)
 
         switch (msg.type) {
         case MSG_EVT_ASYNC:
-            printf("mqttsn_state: async\n");
             break;
         case MSG_EVT_PERIODIC:
 #ifdef SNTP_SYNC
