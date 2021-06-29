@@ -18,6 +18,7 @@ typedef struct mqttsn_stats {
   uint16_t register_fail;
   uint16_t publish_fail;
   uint16_t reset;
+  uint16_t commreset;  
 } mqttsn_stats_t;
 
 extern mqttsn_stats_t mqttsn_stats;
@@ -27,12 +28,24 @@ typedef emcute_topic_t mqpub_topic_t;
 void mqttsn_publisher_init(void);
 mqttsn_state_t mqttsn_publisher_state(void);
 
+#ifndef MQPUB_TOPIC_LENGTH
+#define MQPUB_TOPIC_LENGTH  (64U)
+#endif /* MQPUB_TOPIC_LENGTH */
 
 #ifndef MQTT_TOPIC_BASE
 #define MQTT_TOPIC_BASE "KTH/avr-rss2"
 #endif
 
+#ifndef MQPUB_BASENAME_LENGTH
+#define MQPUB_BASENAME_LENGTH  (32U)
+#endif /* MQPUB_BASENAME_LENGTH */
+
+#ifndef MQPUB_BASENAME_FMT
+#define MQPUB_BASENAME_FMT "urn:dev:mac:%s"
+#endif /* MQPUB_BASENAME_FMT */
+
 #ifndef MQTTSN_GATEWAY_HOST
+//#define  MQTTSN_GATEWAY_HOST "::ffff:c010:7de8"
 #define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
 #endif /* MQTTSN_GATEWAY_HOST */
 #ifndef MQTTSN_GATEWAY_PORT
@@ -49,11 +62,14 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #define MQTTSN_PUBLISH_INTERVAL 600 //1200
 #endif /* MQTTSN_PUBLISH_INTERVAL */
 
+#ifndef MQTTSN_MAX_TOPICS
+/* Max no of topics during a connection  */
+#define MQTTSN_MAX_TOPICS 8
+#endif /* MQTTSN_MAX_TOPICS */
+
 void mqttsn_publisher_init(void);
 
 int get_nodeid(char *buf, size_t size);
-
-size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished);
 
 int mqttsn_stats_cmd(int argc, char **argv);
 
@@ -62,7 +78,8 @@ int mqpub_con(char *host, uint16_t port);
 int mqpub_reg(mqpub_topic_t *topic, char *topicstr);
 int mqpub_discon(void);
 int mqpub_reset(void);
-size_t mqpub_init_topic(char *topic, size_t topiclen, char *suffix);
+size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix);
+size_t mqpub_init_basename(char *basename, size_t basenamelen, char *nodeid);
 
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
 

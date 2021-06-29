@@ -31,36 +31,32 @@
 static int seq_nr_value = 0;
 
 #if defined(MODULE_GNRC_RPL)
-int rpl_report(uint8_t *buf, size_t len, uint8_t *finished);
+int rpl_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 #endif
 #if defined(MODULE_SIM7020)
-int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished);
+int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 #endif
 #ifdef EPCGW
-int epcgwstats_report(uint8_t *buf, size_t len, uint8_t *finished);
+int epcgwstats_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 #endif /* EPCGW */
 
-int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished);
-int boot_report(uint8_t *buf, size_t len, uint8_t *finished);
+int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
+int boot_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 
-static size_t preamble(uint8_t *buf, size_t len) {
+static size_t preamble(uint8_t *buf, size_t len, char *basename) {
      char *s = (char *) buf;
      size_t l = len;
-     size_t n;
      int nread = 0;
      
      RECORD_START(s + nread, l - nread);
-     PUTFMT("{\"bn\":\"urn:dev:mac:");
-     n = get_nodeid(RECORD_STR(), RECORD_LEN());
-     RECORD_ADD(n);
-     PUTFMT(";\"");
+     PUTFMT("{\"bn\":\"%s;\"", basename);
 
      uint64_t basetime = sync_basetime();
      uint32_t utime_sec = basetime/1000000;
      uint32_t utime_msec = (basetime/1000) % 1000;
      PUTFMT(",\"bt\":%" PRIu32 ".%03" PRIu32 "}", utime_sec, utime_msec);
 
-     PUTFMT(",{\"n\":\"seq_no\",\"v\":%d}", 9000+seq_nr_value++);
+     PUTFMT(",{\"n\":\"seq_no\",\"v\":%d}", seq_nr_value++);
      RECORD_END(nread);
 
      return (nread);
@@ -151,7 +147,7 @@ static char *reportfunstr(report_gen_t fun) {
  * Call report function generator to schedule next report function.
  * The report function fills the report with sensor data
  */
-static size_t reports(uint8_t *buf, size_t len, uint8_t *finished) {
+size_t xreports(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep) {
      char *s = (char *) buf;
      size_t l = len;
      size_t nread = 0;
@@ -162,12 +158,42 @@ static size_t reports(uint8_t *buf, size_t len, uint8_t *finished) {
           reportfun = next_report_gen();
      }
      do {
-          int n = reportfun((uint8_t *) s + nread, l - nread, finished);
-          DEBUG("reportfun '%s', n %d (tot %d) finished %d\n", reportfunstr(reportfun), n, nread, (int) finished);
-          if (n == 0)
-               return (nread);
-          else
-               nread += n;
+         int n = reportfun((uint8_t *) s + nread, l - nread, finished, topicp, basenamep);
+         DEBUG("reportfun '%s', n %d (tot %d) finished %d\n", reportfunstr(reportfun), n, nread, (int) finished);
+         if (n == 0)
+             return (nread);
+         else
+             nread += n;
+     } while (!finished);
+     reportfun = NULL;
+     return (nread);
+}
+
+static size_t reports(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep) {
+     char *s = (char *) buf;
+     size_t l = len;
+     size_t nread = 0;
+     static report_gen_t reportfun = NULL;
+
+     if (reportfun == NULL) {
+          reportfun = next_report_gen();
+     }
+     /* Call reportfun with null buffer to set basename first */
+     (void) reportfun(NULL, 0, finished, topicp, basenamep);
+     
+     int n = preamble((uint8_t *) s + nread, l - nread, *basenamep); /* Save one for last bracket */
+     if (n == 0)
+         return (nread);
+     else
+         nread += n;
+
+     do {
+         int n = reportfun((uint8_t *) s + nread, l - nread, finished, topicp, NULL);
+         DEBUG("reportfun '%s', n %d (tot %d) finished %d\n", reportfunstr(reportfun), n, nread, (int) finished);
+         if (n == 0)
+             return (nread);
+         else
+             nread += n;
      } while (!finished);
      reportfun = NULL;
      return (nread);
@@ -177,7 +203,7 @@ static size_t reports(uint8_t *buf, size_t len, uint8_t *finished) {
  * make a sensor report. Write senml preamble to buffer, then call report function to fill
  * with data, and then write senml finish
  */
-size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished) {
+size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished, char **topicp, char **basenamep) {
      char *s = (char *) buffer;
      size_t l = len;
      size_t n;
@@ -185,9 +211,29 @@ size_t makereport(uint8_t *buffer, size_t len, uint8_t *finished) {
      
      RECORD_START(s + nread, l - nread);
      PUTFMT("[");
-     n = preamble((uint8_t *) RECORD_STR(), RECORD_LEN()-1); /* Save one for last bracket */
+     n = reports((uint8_t *) RECORD_STR(), RECORD_LEN()-1, finished, topicp, basenamep); /* Save one for last bracket */
      RECORD_ADD(n);
-     n = reports((uint8_t *) RECORD_STR(), RECORD_LEN()-1, finished); /* Save one for last bracket */
+     PUTFMT("]");
+     RECORD_END(nread);
+
+     return (nread);
+}
+
+/*
+ * make a sensor report. Write senml preamble to buffer, then call report function to fill
+ * with data, and then write senml finish
+ */
+size_t xmakereport(uint8_t *buffer, size_t len, uint8_t *finished, char **topicstrp) {
+     char *s = (char *) buffer;
+     size_t l = len;
+     size_t n;
+     int nread = 0;
+     
+     RECORD_START(s + nread, l - nread);
+     PUTFMT("[");
+     n = preamble((uint8_t *) RECORD_STR(), RECORD_LEN()-1, NULL); /* Save one for last bracket */
+     RECORD_ADD(n);
+     n = reports((uint8_t *) RECORD_STR(), RECORD_LEN()-1, finished, topicstrp, NULL); /* Save one for last bracket */
      RECORD_ADD(n);
      PUTFMT("]");
      RECORD_END(nread);
