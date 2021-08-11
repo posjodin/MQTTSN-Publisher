@@ -32,6 +32,10 @@
 #include "dns_resolve.h"
 #include "watchdog.h"
 
+#ifdef MODULE_SIM7020
+#include "net/sim7020.h"
+#endif /* MODULE_SIM7020 */
+
 #ifdef BOARD_AVR_RSS2
 #include "pstr_print.h"
 #endif
@@ -50,9 +54,9 @@
 mqttsn_stats_t mqttsn_stats;
 
 #ifdef MQTTSN_PUBLISHER_THREAD
-static char mqpub_stack[THREAD_STACKSIZE_DEFAULT + 128];
+static char mqpub_stack[THREAD_STACKSIZE_DEFAULT + 384];
 #endif
-static char emcute_stack[2*THREAD_STACKSIZE_DEFAULT];
+static char emcute_stack[THREAD_STACKSIZE_DEFAULT + 128];
 
 static char default_topicstr[MQPUB_TOPIC_LENGTH];
 static char default_basename[MQPUB_BASENAME_LENGTH];
@@ -171,8 +175,8 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     unsigned flags = EMCUTE_QOS_1;
     int errno;
     
-    //printf("mqpub: publish  %d to %s: \"%s\"\n", len, topic->name, (char *) data);
-    printf("mqpub: publish  %d to topic %u\n", len, topic->id);
+    printf("mqpub: publish  %d to %s: \"%s\"\n", len, topic->name, (char *) data);
+    //printf("mqpub: publish  %d to topic %u\n", len, topic->id);
     if ((errno = emcute_pub((emcute_topic_t *) topic, data, len, flags)) != EMCUTE_OK) {
         printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
                topic->name, (int)topic->id, errno);
@@ -301,7 +305,6 @@ static void _periodic_callback(void *arg)
 {
     msg_t msg = { .type = MSG_EVT_PERIODIC };
     mbox_t *mbox = arg;
-    printf("PERIODIC CALLBACK\n");
     mbox_put(mbox, &msg);
 }
 
@@ -373,15 +376,47 @@ again:
 }
 
 
+/*
+ * Time for periodic publish?
+ */
+/*
+ * Time of last sync 
+ */
+static timex_t last_periodic;
+
+static int timeforperiodic(void) {
+
+#ifdef MODULE_SIM7020
+    if (!sim7020_active()) {
+        return 0;
+    }
+#endif
+
+    /* Make the first publish asap */
+    static uint8_t first = 0;
+    if (!first) {
+        first = 1;
+        return 1;
+    }
+    /* Has timer expired? */
+    timex_t now;
+    xtimer_now_timex(&now);
+    timex_t periodic_due = timex_add(last_periodic, timex_set(MQTTSN_PUBLISH_INTERVAL, 0));
+    return timex_cmp(now, periodic_due) >= 0;
+}
+
+
+#define MQPUB_THREAD_MAX_INTERVAL_SEC 60
 static void *mqpub_thread(void *arg)
 {
     (void)arg;
-    xtimer_t periodic_timer;
-
-    periodic_timer.callback = _periodic_callback;
-    periodic_timer.arg = &evt_mbox;
+    xtimer_t interval_timer;
+    uint32_t interval_secs = 1;
+    last_periodic = timex_set(0, 0);
+    interval_timer.callback = _periodic_callback;
+    interval_timer.arg = &evt_mbox;
     
-    xtimer_set(&periodic_timer, 1*US_PER_SEC);
+    xtimer_set(&interval_timer, interval_secs*US_PER_SEC);
 
     state = MQTTSN_NOT_CONNECTED;
     while (1) {
@@ -390,6 +425,7 @@ static void *mqpub_thread(void *arg)
 
         switch (msg.type) {
         case MSG_EVT_ASYNC:
+            _publish_all();
             break;
         case MSG_EVT_PERIODIC:
 #ifdef SNTP_SYNC
@@ -398,12 +434,19 @@ static void *mqpub_thread(void *arg)
 #ifdef DNS_CACHE_REFRESH
             dns_resolve_refresh();
 #endif /* DNS_CACHE_REFRESH */
-            xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*US_PER_SEC);
+            if (timeforperiodic()) {
+                _publish_all();
+                xtimer_now_timex(&last_periodic);
+            }
+            else 
+            if (interval_secs < MQPUB_THREAD_MAX_INTERVAL_SEC) {
+                interval_secs <<= 1;
+            }
+            xtimer_set(&interval_timer, interval_secs*US_PER_SEC);
             break;
         default:
             printf("mqttsn_state: bad type %d\n", msg.type);
         }
-        _publish_all();
     }
     return NULL;
 }
