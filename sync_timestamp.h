@@ -1,8 +1,33 @@
 #ifndef SYNC_TIMESTAMP_H
 #include "net/sntp.h"
 
-#define NTPP_SYNC_INTERVAL 120 /* seconds */
-#define NTPTIMEOUT 10000000
+/*
+ * How long to wait for response from NTP server
+ */
+#ifndef SYNC_SNTP_TIMEOUT
+#define SYNC_SNTP_TIMEOUT 20000000
+#endif /* SYNC_SNTP_TIMEOUT */
+
+/*
+ * Number of failed attempts before switching to other NTP server
+ */
+#ifndef SYNC_SNTP_MAXATTEMPTS
+#define SYNC_SNTP_MAXATTEMPTS 5
+#endif /* SYNC_SNTP_MAXATTEMPTS */
+
+/*
+ * Time between sync refresh
+ */
+#ifndef SYNC_INTERVAL_SECONDS
+#define SYNC_INTERVAL_SECONDS 3600
+#endif /* SYNC_INTERVAL_SECONDS */
+
+/*
+ * For how long a sync is considered valid
+ */
+#ifndef SYNC_VALID_SECONDS
+#define SYNC_VALID_SECONDS (48*60*60UL)
+#endif /* SYNC_VALID_SECONDS */
 
 /*
  * Init sync

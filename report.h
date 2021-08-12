@@ -17,8 +17,8 @@
 #include "pstr_print.h" 
 #endif
 
-#define WARN printf
-//#define WARN(...)
+//#define WARN printf
+#define WARN(...)
 
 /*
  * Mark start of a record. 

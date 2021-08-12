@@ -13,24 +13,6 @@
 static char *ntp_hosts[] = {"0.se.pool.ntp.org", "::ffff:5bd1:0014"};
 static char **current_ntp_hostp = NULL;
 
-/* 
- * How long to wait for response from NTP server 
- */
-#define SYNC_SNTP_TIMEOUT 20000000
-/*
- * Number of failed attempts before switching to other NTP server
- */
-#define SYNC_SNTP_MAXATTEMPTS 5
-
-/*
- * Time between sync refresh
- */
-#define SYNC_INTERVAL_SECONDS 300
-
-/* 
- * For how long a sync is considered valid 
- */
-#define SYNC_VALID_SECONDS 24*60*1
 /*
  * Time of last sync 
  */
@@ -38,6 +20,12 @@ static timex_t last_sync;
 #endif /* MODULE_SNTP */
 
 static timex_t basetime;
+
+static inline void prt64(uint64_t tstamp) {
+  timex_t tmx = timex_from_uint64(tstamp);
+  char buf[32];
+  printf("%s", timex_to_str(tmx, buf));
+}
 
 void sync_init(void) {
     xtimer_now_timex(&basetime);
@@ -129,10 +117,9 @@ static int sync_with_server(char *host) {
         return res;
     }
     if ((res = sntp_sync(&server, SYNC_SNTP_TIMEOUT)) < 0) {
-        printf("Error in synchronization: %d\n", res);
+        printf("Sync error: %d\n", res);
         return 1;
     }
-    printf("Sync OK!\n");
     return 0;
 }
 
@@ -144,7 +131,7 @@ void sync_periodic(void) {
 
     if (!timetosync())
         return;
-    printf("Time to sync\n");
+
     if (current_ntp_hostp == NULL || *current_ntp_hostp == NULL)
         current_ntp_hostp = &ntp_hosts[0];
     int res = sync_with_server(*current_ntp_hostp);
@@ -170,21 +157,8 @@ uint64_t sync_get_unix_usec(void) {
   
     if (!sync_has_sync())
         return 0;
-    union {
-        struct {
-            uint32_t lower;
-            uint32_t upper;
-        } hexval;
-        uint64_t intval;
-    }ts1;
     uint64_t ts = sntp_get_unix_usec();
     return ts;
-    ts1.intval = ts;
-    printf("Unix 64-bit: %" PRIx32 "%" PRIx32 "\n", ts1.hexval.lower, ts1.hexval.upper);
-
-    uint32_t utime_sec = ts/1000000;
-    uint32_t utime_msec = (ts/1000) % 1000;
-    printf("UNix time: %" PRIu32 ".%03" PRIu32 " msec\n", utime_sec, utime_msec);
 }
 #else
 /*

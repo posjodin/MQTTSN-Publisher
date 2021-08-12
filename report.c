@@ -21,7 +21,7 @@
 #ifdef EPCGW
 #include "../epcgw.h"
 #endif /* EPCGW */
-#define ENABLE_DEBUG    (1)
+#define ENABLE_DEBUG    (0)
 #include "debug.h"
 
 #ifdef BOARD_AVR_RSS2
@@ -119,6 +119,7 @@ report_gen_t next_report_gen(void) {
      return NULL;
 }
 
+#if ENABLE_DEBUG
 static char *reportfunstr(report_gen_t fun) {
   if (fun == NULL)
     return "NUL";
@@ -141,6 +142,11 @@ static char *reportfunstr(report_gen_t fun) {
   else
     return("???");
 }
+#else
+static char *reportfunstr(__attribute__((unused)) report_gen_t fun) {
+    return NULL;
+}
+#endif /* ENABLE_DEBUG */
 
 /*
  * Reports -- build report by writing records to buffer 
