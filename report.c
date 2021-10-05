@@ -136,6 +136,10 @@ static char *reportfunstr(report_gen_t fun) {
   else if (fun == epcgwstats_report)
     return("epcgwstats");
 #endif
+#if defined(APP_GATEWAY)
+  else if (fun == app_gateway_report)
+    return("app_gateway");
+#endif
   else if (fun == mqttsn_report)
     return("mqttsn");
   else
