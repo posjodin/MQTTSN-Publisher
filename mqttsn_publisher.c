@@ -29,9 +29,17 @@
 #ifdef SNTP_SYNC
 #include "sync_timestamp.h"
 #endif /* SNTP_SYNC */
+
 #ifdef APP_WATCHDOG
 #include "app_watchdog.h"
 #endif /* APP_WATCHDOG */
+
+#include "dns_resolve.h"
+
+#ifdef MODULE_SIM7020
+#include "net/sim7020.h"
+#endif /* MODULE_SIM7020 */
+
 #ifdef BOARD_AVR_RSS2
 #include "pstr_print.h"
 #endif
@@ -53,9 +61,9 @@
 mqttsn_stats_t mqttsn_stats;
 
 #ifdef MQTTSN_PUBLISHER_THREAD
-static char mqpub_stack[THREAD_STACKSIZE_DEFAULT + 128];
+static char mqpub_stack[THREAD_STACKSIZE_DEFAULT + 384];
 #endif
-static char emcute_stack[2*THREAD_STACKSIZE_DEFAULT];
+static char emcute_stack[THREAD_STACKSIZE_DEFAULT + 128];
 
 static char default_topicstr[MQPUB_TOPIC_LENGTH];
 static char default_basename[MQPUB_BASENAME_LENGTH];
@@ -136,7 +144,6 @@ size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix
     size_t len = topiclen;
     int n;
     
-    printf("INIT topic len %d: nodeid '%s' suffix '%s'\n", topiclen, nodeid, suffix);
     n = snprintf(buf, len, "%s/%s", MQTT_TOPIC_BASE, nodeid);
     if (suffix != NULL) {
         n = strlcat(buf, suffix, len);
@@ -155,7 +162,6 @@ size_t mqpub_init_basename(char *basename, size_t basenamelen, char *nodeid) {
     size_t len = basenamelen;
     int n;
     
-    printf("INIT basename len %d: nodeid '%s''\n", len, nodeid);
     n = snprintf(buf, len, MQPUB_BASENAME_FMT, nodeid);
     return n;
 }
@@ -177,6 +183,7 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     int errno;
     
     printf("mqpub: publish  %d to %s: \"%s\"\n", len, topic->name, (char *) data);
+
     LEDON;
     if ((errno = emcute_pub((emcute_topic_t *) topic, data, len, flags)) != EMCUTE_OK) {
         printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
@@ -191,34 +198,6 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     app_watchdog_update(errno == EMCUTE_OK);
 #endif /* APP_WATCHDOG */
     return errno;
-}
-
-int dns_resolve_inetaddr(char *host, ipv6_addr_t *result) {
-    /* Is host a v6 address? */
-    if (ipv6_addr_from_str(result, host) != NULL) {
-        return 0;
-    }
-    
-#if defined(MODULE_SOCK_DNS) || defined(MODULE_SIM7020_SOCK_DNS) 
-#ifdef DNS_RESOLVER
-    sock_dns_server.family = AF_INET6;
-    sock_dns_server.port = 53;    
-    if (ipv6_addr_from_str((ipv6_addr_t *)&sock_dns_server.addr.ipv6, DNS_RESOLVER) == NULL) {
-         printf("Bad resolver address %s\n", DNS_RESOLVER);
-         return -1;
-    }
-#endif /* DNS_RESOLVER */
-    result->u64[0].u64 = 0;
-    result->u16[4].u16 = 0;
-    result->u16[5].u16 = 0xffff;
-
-    printf("dns_resolve_inetaddr %s\n", host);
-    int res;
-    res = sock_dns_query(host, &result->u32[3].u32, AF_INET);
-    return res;
-#else
-    return -1;
-#endif    
 }
 
 static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
@@ -256,7 +235,6 @@ int mqpub_con(char *host, uint16_t port) {
 int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
     int errno;
     topic->name = topicstr;
-    printf("mqpub: register %s\n", topic->name);
     if ((errno = emcute_reg((emcute_topic_t *) topic)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", topicstr, errno);
@@ -358,7 +336,6 @@ static void _periodic_callback(void *arg)
 {
     msg_t msg = { .type = MSG_EVT_PERIODIC };
     mbox_t *mbox = arg;
-    printf("PERIODIC CALLBACK\n");
     mbox_put(mbox, &msg);
 }
 
@@ -430,38 +407,77 @@ again:
 }
 
 
+/*
+ * Time for periodic publish?
+ */
+/*
+ * Time of last sync 
+ */
+static timex_t last_periodic;
+
+static int timeforperiodic(void) {
+
+#ifdef MODULE_SIM7020
+    if (!sim7020_active()) {
+        return 0;
+    }
+#endif
+
+    /* Make the first publish asap */
+    static uint8_t first = 0;
+    if (!first) {
+        first = 1;
+        return 1;
+    }
+    /* Has timer expired? */
+    timex_t now;
+    xtimer_now_timex(&now);
+    timex_t periodic_due = timex_add(last_periodic, timex_set(MQTTSN_PUBLISH_INTERVAL, 0));
+    return timex_cmp(now, periodic_due) >= 0;
+}
+
+
+#define MQPUB_THREAD_MAX_INTERVAL_SEC 60
 static void *mqpub_thread(void *arg)
 {
     (void)arg;
-    xtimer_t periodic_timer;
-
-    periodic_timer.callback = _periodic_callback;
-    periodic_timer.arg = &evt_mbox;
+    xtimer_t interval_timer;
+    uint32_t interval_secs = 1;
+    last_periodic = timex_set(0, 0);
+    interval_timer.callback = _periodic_callback;
+    interval_timer.arg = &evt_mbox;
     
-    xtimer_set(&periodic_timer, 1*US_PER_SEC);
+    xtimer_set(&interval_timer, interval_secs*US_PER_SEC);
 
     state = MQTTSN_NOT_CONNECTED;
     while (1) {
-#ifdef SNTP_SYNC
-        sync_periodic(); 
-#endif /* SNTP_SYNC */
-
         msg_t msg;
         mbox_get(&evt_mbox, &msg);
 
         switch (msg.type) {
         case MSG_EVT_ASYNC:
-            printf("mqttsn_state: async\n");
+            _publish_all();
             break;
         case MSG_EVT_PERIODIC:
-            printf("mqttsn_state: periodic\n");
-            printf("%d: xtimer_set %" PRIu32 "\n", __LINE__, MQTTSN_PUBLISH_INTERVAL);
-            xtimer_set(&periodic_timer, MQTTSN_PUBLISH_INTERVAL*US_PER_SEC);
+#ifdef SNTP_SYNC
+            sync_periodic();
+#endif /* SNTP_SYNC */
+#ifdef DNS_CACHE_REFRESH
+            dns_resolve_refresh();
+#endif /* DNS_CACHE_REFRESH */
+            if (timeforperiodic()) {
+                _publish_all();
+                xtimer_now_timex(&last_periodic);
+            }
+            else 
+            if (interval_secs < MQPUB_THREAD_MAX_INTERVAL_SEC) {
+                interval_secs <<= 1;
+            }
+            xtimer_set(&interval_timer, interval_secs*US_PER_SEC);
             break;
         default:
             printf("mqttsn_state: bad type %d\n", msg.type);
         }
-        _publish_all();
     }
     return NULL;
 }
@@ -478,12 +494,11 @@ void mqttsn_publisher_init(void) {
 
     _init_default_topicstr();
     _init_default_basename();
+    dns_resolve_init();
 
     /* start emcute thread */
     emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,
                                emcute_thread, NULL, "emcute");
-    printf("Start emcute: pid %d\n", emcute_pid);
-    (void) emcute_thread; (void) emcute_stack;
 #ifdef MQTTSN_PUBLISHER_THREAD
     /* start publisher thread */
     mqpub_pid = thread_create(mqpub_stack, sizeof(mqpub_stack), MQPUB_PRIO, THREAD_CREATE_STACKTEST,
@@ -541,6 +556,7 @@ int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished,
      case s_reset:
           RECORD_START(s + nread, l - nread);
           PUTFMT(",{\"n\":\"mqtt_sn;stats;reset\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.reset);
+          PUTFMT(",{\"n\":\"mqtt_sn;stats;commreset\",\"u\":\"count\",\"v\":%d}", mqttsn_stats.commreset);
           RECORD_END(nread);
 
           state = s_gateway;
@@ -576,5 +592,6 @@ int mqttsn_stats_cmd(int argc, char **argv) {
     printf("  register: success %d, fail %d\n", st->register_ok, st->register_fail);
     printf("  publish: success %d, fail %d\n", st->publish_ok, st->publish_fail);
     printf("  reset: %d\n", st->reset);
+    printf("  commreset: %d\n", st->commreset);
     return 0;
 }

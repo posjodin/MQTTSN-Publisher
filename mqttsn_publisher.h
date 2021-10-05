@@ -18,6 +18,7 @@ typedef struct mqttsn_stats {
   uint16_t register_fail;
   uint16_t publish_fail;
   uint16_t reset;
+  uint16_t commreset;  
 } mqttsn_stats_t;
 
 extern mqttsn_stats_t mqttsn_stats;
@@ -44,8 +45,8 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #endif /* MQPUB_BASENAME_FMT */
 
 #ifndef MQTTSN_GATEWAY_HOST
-#define  MQTTSN_GATEWAY_HOST "::ffff:c010:7de8"
-//#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
+//#define  MQTTSN_GATEWAY_HOST "::ffff:c010:7de8"
+#define MQTTSN_GATEWAY_HOST "lab-pc.ssvl.kth.se"
 #endif /* MQTTSN_GATEWAY_HOST */
 #ifndef MQTTSN_GATEWAY_PORT
 //#define MQTTSN_GATEWAY_PORT 1884
