@@ -39,7 +39,9 @@ int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, c
 #ifdef EPCGW
 int epcgwstats_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 #endif /* EPCGW */
-
+#ifdef MODULE_NETSTATS
+int if_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
+#endif /* MODULE_NETSTATS */
 int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 
@@ -76,6 +78,9 @@ typedef enum {
 #if defined(EPCGW)
   s_epcgwstats_report,
 #endif
+#if defined(MODULE_NETSTATS)
+  s_if_report,
+#endif
   s_mqttsn_report,
   s_max_report
 } report_state_t;
@@ -110,6 +115,10 @@ report_gen_t next_report_gen(void) {
 #if defined(EPCGW)
      case s_epcgwstats_report:
          return epcgwstats_report;
+#endif
+#if defined(MODULE_NETSTATS)
+     case s_if_report:
+         return if_report;
 #endif
      case s_mqttsn_report:
           return(mqttsn_report);
