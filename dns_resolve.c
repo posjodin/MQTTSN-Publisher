@@ -10,9 +10,13 @@
 #endif
 #include "xtimer.h"
 
+#ifdef APP_WATCHDOG
+#include "app_watchdog.h"
+#endif /* APP_WATCHDOG */
 #ifdef BOARD_AVR_RSS2
 #include "pstr_print.h"
 #endif
+
 #include "dns_resolve.h"
 
 #define MAX_HOSTNAME_LENGTH 64
@@ -58,6 +62,18 @@ static dns_cache_t *cache_alloc(void) {
     return oldest;
 }
 
+static void cache_update(char *host, ipv6_addr_t *result) {
+    dns_cache_t *cache_entry = cache_lookup(host);
+    if (cache_entry == NULL)
+        cache_entry = cache_alloc();
+    if (cache_entry != NULL) {
+        cache_entry->host = host;
+        cache_entry->ipv6addr = *result;
+        cache_entry->state = RESOLVED;
+        cache_entry->time_usec = xtimer_now_usec();
+    }
+}
+
 static int _resolve_inetaddr(char *host, ipv6_addr_t *result) {
 #if defined(MODULE_SOCK_DNS) || defined(MODULE_SIM7020_SOCK_DNS) 
 #ifdef DNS_RESOLVER
@@ -71,20 +87,14 @@ static int _resolve_inetaddr(char *host, ipv6_addr_t *result) {
     result->u64[0].u64 = 0;
     result->u16[4].u16 = 0;
     result->u16[5].u16 = 0xffff;
-
     int res = sock_dns_query(host, &result->u32[3].u32, AF_INET);
     if (res >= 0) {
         /* Cache result */
-        dns_cache_t *cache_entry = cache_lookup(host);
-        if (cache_entry == NULL)
-            cache_entry = cache_alloc();
-        if (cache_entry != NULL) {
-            cache_entry->host = host;
-            cache_entry->ipv6addr = *result;
-            cache_entry->state = RESOLVED;
-            cache_entry->time_usec = xtimer_now_usec();
-        }
+        cache_update(host, result);
     }
+#ifdef APP_WATCHDOG
+    app_watchdog_update(res >= 0);
+#endif /* APP_WATCHDOG */
     return res;
 #else
     return -1;
