@@ -2,6 +2,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <avr/eeprom.h>
+
 #include "net/ipv6/addr.h"
 #if defined(MODULE_SOCK_DNS)
 #include "net/sock/dns.h"
@@ -21,7 +23,7 @@
 
 #define MAX_HOSTNAME_LENGTH 64
 struct dns_cache {
-    char *host;
+    char host[MAX_HOSTNAME_LENGTH];
     ipv6_addr_t ipv6addr;
     uint32_t time_usec;
     enum {
@@ -34,10 +36,16 @@ typedef struct dns_cache dns_cache_t;
 
 static dns_cache_t dns_resolve_cache[DNS_CACHE_SIZE];
 
+static EEMEM dns_cache_t ee_dns_resolve_cache[DNS_CACHE_SIZE];
+
 void dns_resolve_init(void) {
     dns_cache_t *dc;
-    for (dc = &dns_resolve_cache[0]; dc <= &dns_resolve_cache[DNS_CACHE_SIZE-1]; dc++)
-        dc->state = UNUSED;
+    eeprom_read_block(&dns_resolve_cache, &ee_dns_resolve_cache, sizeof(dns_resolve_cache));
+    for (dc = &dns_resolve_cache[0]; dc <= &dns_resolve_cache[DNS_CACHE_SIZE-1]; dc++) {
+        if (dc->state != RESOLVED)
+            dc->state = UNUSED;
+    }
+    eeprom_update_block(&dns_resolve_cache, &ee_dns_resolve_cache, sizeof(dns_resolve_cache));    
 }
 
 static dns_cache_t *cache_lookup(char *host) {
@@ -67,10 +75,11 @@ static void cache_update(char *host, ipv6_addr_t *result) {
     if (cache_entry == NULL)
         cache_entry = cache_alloc();
     if (cache_entry != NULL) {
-        cache_entry->host = host;
+        strncpy(cache_entry->host, host, sizeof(cache_entry->host));
         cache_entry->ipv6addr = *result;
         cache_entry->state = RESOLVED;
         cache_entry->time_usec = xtimer_now_usec();
+        eeprom_update_block(&dns_resolve_cache, &ee_dns_resolve_cache, sizeof(dns_resolve_cache));    
     }
 }
 
@@ -124,7 +133,7 @@ void dns_resolve_refresh(void) {
             if (now - dc->time_usec >= DNS_CACHE_REFRESH_PERIOD) {
                 ipv6_addr_t dummy;
                 _resolve_inetaddr(dc->host, &dummy);
-                /* Only one refresh per invocation */
+                /* Only one refresh attempt per invocation */
                 return;
             }
         }
