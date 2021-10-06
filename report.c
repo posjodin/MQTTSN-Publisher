@@ -42,6 +42,9 @@ int epcgwstats_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp
 #ifdef MODULE_NETSTATS
 int if_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 #endif /* MODULE_NETSTATS */
+#ifdef APP_WATCHDOG
+int app_watchdog_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
+#endif /* APP_WATCHDOG */
 int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 
@@ -81,6 +84,9 @@ typedef enum {
 #if defined(MODULE_NETSTATS)
   s_if_report,
 #endif
+#if defined(APP_WATCHDOG)
+  s_app_watchdog_report,
+#endif
   s_mqttsn_report,
   s_max_report
 } report_state_t;
@@ -119,6 +125,10 @@ report_gen_t next_report_gen(void) {
 #if defined(MODULE_NETSTATS)
      case s_if_report:
          return if_report;
+#endif
+#if defined(APP_WATCHDOG)
+     case s_app_watchdog_report:
+         return app_watchdog_report;
 #endif
      case s_mqttsn_report:
           return(mqttsn_report);
