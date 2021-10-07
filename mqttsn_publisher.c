@@ -495,6 +495,9 @@ void mqttsn_publisher_init(void) {
     _init_default_topicstr();
     _init_default_basename();
     dns_resolve_init();
+#ifdef APP_WATCHDOG
+    app_watchdog_init();
+#endif /* APP_WATCHDOG */    
 
     /* start emcute thread */
     emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,
