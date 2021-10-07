@@ -1,0 +1,167 @@
+/*
+ * Copyright (C) 2020 Peter Sjödin, KTH
+ *
+ * This file is subject to the terms and conditions of the GNU Lesser
+ * General Public License v2.1. See the file LICENSE in the top level
+ * directory for more details.
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include <avr/eeprom.h>
+
+#include "xtimer.h"
+#include "timex.h"
+
+#ifdef MODULE_SIM7020
+#include "net/af.h"
+#include "net/ipv4/addr.h"
+#include "net/ipv6/addr.h"
+#include "net/sock/udp.h"
+
+#include "net/sim7020.h"
+#endif /* MODULE_SIM7020 */
+
+#include "hashes.h"
+
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h"
+#endif
+#include "periph/pm.h"
+
+#include "report.h"
+#include "sync_timestamp.h"
+
+#include "app_watchdog.h"
+
+static uint16_t consec_fails;
+static uint32_t last_recovery;
+
+static struct {
+    uint32_t noprogress;                 /* No. of lack-of-progress events */
+    uint32_t recovery;                   /* No. of recoveries */
+} awd_stats;
+
+typedef struct {
+    uint32_t restarts;
+    uint64_t last_timestamp;
+} perm_awd_stats_t;
+
+static perm_awd_stats_t perm_awd_stats;
+static EEMEM perm_awd_stats_t ee_perm_awd_stats;
+static EEMEM uint32_t ee_hash;
+
+/*
+ * Read DNS cache from EEPROM. Use a hash in EEPROM to verify that the info in the
+ * EEPROM is valid. Read info, compute hash, and compare with
+ * hash in EEPROM. Return non-zero if hashes match (ie info in EEPROM
+ * is valid).
+ */
+
+static int read_eeprom(void) {
+    eeprom_read_block(&perm_awd_stats, &ee_perm_awd_stats, sizeof(perm_awd_stats));
+    uint32_t ehash = eeprom_read_dword(&ee_hash);
+    uint32_t hash = dek_hash((uint8_t *) &perm_awd_stats, sizeof(perm_awd_stats));
+    return ehash == hash;
+}
+
+/*
+ * Update cache and its hash in EEPROM
+ */
+static void update_eeprom(void) {
+    eeprom_update_block(&perm_awd_stats, &ee_perm_awd_stats, sizeof(perm_awd_stats));
+    uint32_t hash = dek_hash((uint8_t *) &perm_awd_stats, sizeof(perm_awd_stats));
+    eeprom_update_dword(&ee_hash, hash);
+}
+
+void app_watchdog_init(void) {
+    if (read_eeprom() == 0) {
+        perm_awd_stats.restarts = 0;
+        perm_awd_stats.last_timestamp = 0;        
+    }
+    else {
+     uint32_t utime_sec = perm_awd_stats.last_timestamp/1000000;
+     uint32_t utime_msec = (perm_awd_stats.last_timestamp/1000) % 1000;
+
+        printf("Read AWD. Restarts %" PRIu32 " tstamp %" PRIu32 ".%" PRIu32 "\n",
+               perm_awd_stats.restarts,
+               utime_sec, utime_msec);
+    }
+}
+
+/*
+ * Time for recovery action? Too many consecutive failures, and 
+ * sufficiently long since last recovery?
+ */
+static int awd_should_recover(void) {
+    if (consec_fails > APP_WATCHDOG_MAX_CONSEC_FAILS) {
+        uint32_t now = xtimer_now_usec();
+        if ((now - last_recovery)/US_PER_SEC >= APP_WATCHDOG_MIN_RECOVERY_INTERVAL_SEC) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void awd_restart(void) {
+    perm_awd_stats.restarts++;
+    perm_awd_stats.last_timestamp = sync_get_unix_ticks64(xtimer_now_usec64());
+    update_eeprom();
+    pm_reboot(); /* Bye */
+}
+
+/*
+ * Recovery - reboot if too many recoveries already, otherwise
+ * do hardware recovery 
+ */
+static void awd_recovery(void) {
+    awd_stats.recovery++;
+#ifdef APP_WATCHDOG_MAX_RECOVERIES
+    if (awd_stats.recovery >= APP_WATCHDOG_MAX_RECOVERIES) {
+        printf("Rebooting...\n"); xtimer_sleep(3);
+        awd_restart(); /* No return */
+    }
+#endif /* APP_WATCHDOG_REBOOT_RECOVERIES */
+    last_recovery = xtimer_now_usec();
+#ifdef MODULE_SIM7020
+    printf("Restart SIM7020\n");
+    /* Restart module */
+    sim7020_reset();
+#endif
+}
+
+void app_watchdog_update(int progress) {
+    if (progress) 
+        consec_fails = 0;
+    else {
+        consec_fails++;
+        awd_stats.noprogress++;
+        if (awd_should_recover()) {
+            awd_recovery();
+        }
+    }
+}
+
+int app_watchdog_report(uint8_t *buf, size_t len, uint8_t *finished, 
+                        __attribute__((unused)) char **topicp, __attribute__((unused)) char **basenamep) {
+     char *s = (char *) buf;
+     size_t l = len;
+     int nread = 0;
+     
+     *finished = 0;
+     RECORD_START(s + nread, l - nread);
+     PUTFMT(",{\"n\":\"appwd;stats;\",\"vj\":[");
+     PUTFMT("{\"n\":\"noprogress\",\"u\":\"count\",\"v\":%" PRIu32 "},", awd_stats.noprogress);
+     PUTFMT("{\"n\":\"recovery\",\"u\":\"count\",\"v\":%" PRIu32 "},", awd_stats.recovery);
+     PUTFMT("{\"n\":\"restarts\",\"u\":\"count\",\"v\":%" PRIu32 "},", perm_awd_stats.restarts);
+     uint32_t utime_sec = perm_awd_stats.last_timestamp/1000000;
+     uint32_t utime_msec = (perm_awd_stats.last_timestamp/1000) % 1000;
+     PUTFMT("{\"n\":\"restart_time\",\"v\":%" PRIu32 ".%03" PRIu32 "}", utime_sec, utime_msec);
+     PUTFMT("]}");
+     RECORD_END(nread);
+     *finished = 1;
+
+     return nread;
+}

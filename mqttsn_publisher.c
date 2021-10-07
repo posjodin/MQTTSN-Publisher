@@ -29,8 +29,12 @@
 #ifdef SNTP_SYNC
 #include "sync_timestamp.h"
 #endif /* SNTP_SYNC */
+
+#ifdef APP_WATCHDOG
+#include "app_watchdog.h"
+#endif /* APP_WATCHDOG */
+
 #include "dns_resolve.h"
-#include "watchdog.h"
 
 #ifdef MODULE_SIM7020
 #include "net/sim7020.h"
@@ -45,6 +49,9 @@
 #define MQPUB_PRIO         (THREAD_PRIORITY_MAIN + 1)
 
 #define NUMOFSUBS           (16U)
+
+#define LEDON LED1_ON
+#define LEDOFF LED1_OFF
 
 /* State machine interval in secs */
 #define MQPUB_STATE_INTERVAL 2
@@ -176,18 +183,21 @@ int mqpub_pub(mqpub_topic_t *topic, void *data, size_t len) {
     int errno;
     
     printf("mqpub: publish  %d to %s: \"%s\"\n", len, topic->name, (char *) data);
-    //printf("mqpub: publish  %d to topic %u\n", len, topic->id);
+
+    LEDON;
     if ((errno = emcute_pub((emcute_topic_t *) topic, data, len, flags)) != EMCUTE_OK) {
         printf("\n\nerror: unable to publish data to topic '%s [%i]' (error %d)\n",
                topic->name, (int)topic->id, errno);
         mqttsn_stats.publish_fail += 1;
-        watchdog_fail();
-        return errno;
     }
-    watchdog_update();
-    mqttsn_stats.publish_ok += 1;
-    return 0;
-    
+    else {
+        mqttsn_stats.publish_ok += 1;
+    }
+    LEDOFF;
+#ifdef APP_WATCHDOG
+    app_watchdog_update(errno == EMCUTE_OK);
+#endif /* APP_WATCHDOG */
+    return errno;
 }
 
 static int _resolve_v6addr(char *host, ipv6_addr_t *result) {
@@ -206,16 +216,20 @@ int mqpub_con(char *host, uint16_t port) {
     printf("mqpub: Connect to [");
     ipv6_addr_print((ipv6_addr_t *) &gw.addr.ipv6);
     printf("]:%d\n", gw.port);
+    LEDON;
     if ((errno = emcute_con(&gw, true, NULL, NULL, 0, 0)) != EMCUTE_OK) {
-         printf("error: unable to connect to gateway [%s]:%d (error %d)\n", host, port, errno);
+        printf("error: unable to connect to gateway [%s]:%d (error %d)\n", host, port, errno);
         mqttsn_stats.connect_fail += 1;
-        watchdog_fail();
-        return 1;
     }
-    printf("MQTT-SN: Connect to [%s]:%d\n", host, port);
-    mqttsn_stats.connect_ok += 1;
-    watchdog_update();
-    return 0;
+    else {
+        printf("MQTT-SN: Connect to gateway [%s]:%d\n", host, port);
+        mqttsn_stats.connect_ok += 1;
+    }
+    LEDOFF;
+#ifdef APP_WATCHDOG
+    app_watchdog_update(errno == EMCUTE_OK);
+#endif /* APP_WATCHDOG */
+    return errno;
 }
 
 int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
@@ -224,13 +238,15 @@ int mqpub_reg(mqpub_topic_t *topic, char *topicstr) {
     if ((errno = emcute_reg((emcute_topic_t *) topic)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", topicstr, errno);
-        watchdog_fail();
-        return 1;
     }
-    printf("Register topic %d for \"%s\"\n", (int)topic->id, topicstr);
-    watchdog_update();
-    mqttsn_stats.register_ok += 1;
-    return 0;
+    else {
+        printf("Register topic %d for \"%s\"\n", (int)topic->id, topicstr);
+        mqttsn_stats.register_ok += 1;
+    }
+#ifdef APP_WATCHDOG
+    app_watchdog_update(errno == EMCUTE_OK);
+#endif /* APP_WATCHDOG */
+    return errno;
 }
 
 mqpub_topic_t *mqpub_reg_topic(char *topicstr) {
@@ -242,31 +258,46 @@ mqpub_topic_t *mqpub_reg_topic(char *topicstr) {
         return NULL;
     }
     printf("mqpub: register %s\n", tp->name);
+    LEDON;
     if ((errno = emcute_reg((emcute_topic_t *) tp)) != EMCUTE_OK) {
         mqttsn_stats.register_fail += 1;
         printf("error: unable to obtain topic ID for \"%s\" (error %d)\n", tp->name, errno);
         _reset_topic(tp);
-        watchdog_fail();
-        return NULL;
+        tp = NULL;
     }
-    printf("Register topic %d for \"%s\"\n", (int)tp->id, tp->name);
-    mqttsn_stats.register_ok += 1;
-    watchdog_update();
+    else {
+        printf("Register topic %d for \"%s\"\n", (int)tp->id, tp->name);
+        mqttsn_stats.register_ok += 1;
+    }
+    LEDOFF;
+#ifdef APP_WATCHDOG
+    app_watchdog_update(errno == EMCUTE_OK);
+#endif /* APP_WATCHDOG */
     return tp;
 }
 
 int mqpub_discon(void) {
-    return emcute_discon();
+    LEDON;
+    int errno = emcute_discon();
+    LEDOFF;
+#ifdef APP_WATCHDOG
+    app_watchdog_update(errno == 0);
+#endif /* APP_WATCHDOG */
+    return errno;
 }
 
 int mqpub_reset(void) {
+    LEDON;
     int errno = mqpub_discon();
+    LEDOFF;
     mqttsn_stats.reset += 1;
     if (errno != EMCUTE_OK) {
         printf("MQTT-SN: disconnect failed %d\n", errno);
-        return errno;
     }
-    return 0;
+#ifdef APP_WATCHDOG
+    app_watchdog_update(errno == 0);
+#endif /* APP_WATCHDOG */
+    return errno;
 }
 
 /*
@@ -464,6 +495,9 @@ void mqttsn_publisher_init(void) {
     _init_default_topicstr();
     _init_default_basename();
     dns_resolve_init();
+#ifdef APP_WATCHDOG
+    app_watchdog_init();
+#endif /* APP_WATCHDOG */    
 
     /* start emcute thread */
     emcute_pid = thread_create(emcute_stack, sizeof(emcute_stack), EMCUTE_PRIO, THREAD_CREATE_STACKTEST,

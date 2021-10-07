@@ -39,7 +39,12 @@ int sim7020_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, c
 #ifdef EPCGW
 int epcgwstats_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 #endif /* EPCGW */
-
+#ifdef MODULE_NETSTATS
+int if_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
+#endif /* MODULE_NETSTATS */
+#ifdef APP_WATCHDOG
+int app_watchdog_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
+#endif /* APP_WATCHDOG */
 int mqttsn_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 int boot_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);
 
@@ -76,6 +81,12 @@ typedef enum {
 #if defined(EPCGW)
   s_epcgwstats_report,
 #endif
+#if defined(MODULE_NETSTATS)
+  s_if_report,
+#endif
+#if defined(APP_WATCHDOG)
+  s_app_watchdog_report,
+#endif
   s_mqttsn_report,
   s_max_report
 } report_state_t;
@@ -111,6 +122,14 @@ report_gen_t next_report_gen(void) {
      case s_epcgwstats_report:
          return epcgwstats_report;
 #endif
+#if defined(MODULE_NETSTATS)
+     case s_if_report:
+         return if_report;
+#endif
+#if defined(APP_WATCHDOG)
+     case s_app_watchdog_report:
+         return app_watchdog_report;
+#endif
      case s_mqttsn_report:
           return(mqttsn_report);
      default:
@@ -136,6 +155,10 @@ static char *reportfunstr(report_gen_t fun) {
 #if defined(EPCGW)
   else if (fun == epcgwstats_report)
     return("epcgwstats");
+#endif
+#if defined(APP_GATEWAY)
+  else if (fun == app_gateway_report)
+    return("app_gateway");
 #endif
   else if (fun == mqttsn_report)
     return("mqttsn");
