@@ -72,6 +72,17 @@ void dns_resolve_init(void) {
             dc->state = UNUSED;
         }
     }
+    else {
+        printf("DNS cache: ");
+        for (dc = &dns_resolve_cache[0]; dc <= &dns_resolve_cache[DNS_CACHE_SIZE-1]; dc++) {
+            if (dc->state == RESOLVED) {
+                printf("%s: ", dc->host);
+                ipv6_addr_print(&dc->ipv6addr);
+                printf(" ");
+            }
+        }
+        printf("\n");
+    }
 }
 
 /*
