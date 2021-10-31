@@ -21,7 +21,7 @@
 #ifdef EPCGW
 #include "../epcgw.h"
 #endif /* EPCGW */
-#define ENABLE_DEBUG    (0)
+#define ENABLE_DEBUG    (1)
 #include "debug.h"
 
 #ifdef BOARD_AVR_RSS2
@@ -140,30 +140,34 @@ report_gen_t next_report_gen(void) {
 
 #if ENABLE_DEBUG
 static char *reportfunstr(report_gen_t fun) {
-  if (fun == NULL)
-    return "NUL";
-  else if (fun == boot_report)
-    return "boot";
+    if (fun == NULL)
+        return "NUL";
+    else if (fun == boot_report)
+        return "boot";
 #if defined(MODULE_GNRC_RPL)
-  else if (fun == rpl_report)
-    return("rpl");
+    else if (fun == rpl_report)
+        return("rpl");
 #endif
 #if defined(MODULE_SIM7020)
-  else if (fun == sim7020_report)
-    return("sim7020");
+    else if (fun == sim7020_report)
+        return("sim7020");
 #endif
 #if defined(EPCGW)
-  else if (fun == epcgwstats_report)
-    return("epcgwstats");
+    else if (fun == epcgwstats_report)
+        return("epcgwstats");
 #endif
-#if defined(APP_GATEWAY)
-  else if (fun == app_gateway_report)
-    return("app_gateway");
+#if defined(MODULE_NETSTATS)
+    else if (fun == if_report)
+        return("if");
 #endif
-  else if (fun == mqttsn_report)
-    return("mqttsn");
-  else
-    return("???");
+#if defined(APP_WATCHDOG)
+    else if (fun == app_watchdog_report)
+        return("app_watchdog");
+#endif
+    else if (fun == mqttsn_report)
+        return("mqttsn");
+    else
+        return("???");
 }
 #else
 static char *reportfunstr(__attribute__((unused)) report_gen_t fun) {
@@ -207,9 +211,10 @@ static size_t reports(uint8_t *buf, size_t len, uint8_t *finished, char **topicp
      if (reportfun == NULL) {
           reportfun = next_report_gen();
      }
+     DEBUG("reportfun '%s' null\n", reportfunstr(reportfun));
      /* Call reportfun with null buffer to set basename first */
      (void) reportfun(NULL, 0, finished, topicp, basenamep);
-     
+     DEBUG("preamble for '%s'\n", reportfunstr(reportfun));     
      int n = preamble((uint8_t *) s + nread, l - nread, *basenamep); /* Save one for last bracket */
      if (n == 0)
          return (nread);
