@@ -11,6 +11,13 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "thread.h"
+#include "mbox.h"
+#include "msg.h"
+#include "xtimer.h"
+#include "timex.h"
+#include "shell.h"
+
 #include "net/af.h"
 #include "net/ipv4/addr.h"
 #include "net/ipv6/addr.h"
@@ -18,12 +25,18 @@
 
 #include "periph/uart.h"
 
+#include "at.h"
 #include "net/sim7020.h"
+#include "sim7020x.h"
+
+
+sim7020x_t *sim7020x_get_dev(void);
 
 int sim7020cmd_init(int argc, char **argv) {
   
   (void) argc; (void) argv;
 
+  //sim7020x_t *dev = sim7020x_get_dev();
   //int res = sim7020_init(UART_DEV(1), 9600);
   int res = sim7020_init();  
   if (res < 0)
@@ -36,8 +49,8 @@ int sim7020cmd_init(int argc, char **argv) {
 int sim7020cmd_register(int argc, char **argv) {
   
   (void) argc; (void) argv;
-
-  int res = sim7020_register();
+  sim7020x_t *dev = sim7020x_get_dev();
+  int res = sim7020_register(dev);
   if (res < 0)
     printf("Error %d\n", res);
   else
@@ -48,8 +61,8 @@ int sim7020cmd_register(int argc, char **argv) {
 int sim7020cmd_activate(int argc, char **argv) {
   
   (void) argc; (void) argv;
-
-  int res = sim7020_activate();
+  sim7020x_t *dev = sim7020x_get_dev();
+  int res = sim7020_activate(dev);
   if (res < 0)
     printf("Error %d\n", res);
   else
@@ -60,8 +73,8 @@ int sim7020cmd_activate(int argc, char **argv) {
 int sim7020cmd_status(int argc, char **argv) {
   
   (void) argc; (void) argv;
-
-  int res = sim7020_status();
+  sim7020x_t *dev = sim7020x_get_dev();
+  int res = sim7020_status(dev);
   if (res < 0)
     printf("Error %d\n", res);
   else
@@ -197,7 +210,8 @@ int sim7020cmd_test(int argc, char **argv) {
     count = atoi(argv[2]);
   else
     count = -1;
-  int res = sim7020_test(sockid, count);
+  sim7020x_t *dev = sim7020x_get_dev();
+  int res = sim7020_test(dev, sockid, count);
   if (res < 0)
     printf("Error %d\n", res);
   else
@@ -219,7 +233,8 @@ int sim7020cmd_at(int argc, char **argv) {
             first = 0;
         (void) strlcat(cmd, argv[i], sizeof(cmd));
     }
-    return sim7020_at(cmd);
+    void *dev = sim7020x_get_dev();
+    return sim7020_at(dev, cmd);
 }
 
 int sim7020cmd_reset(int argc, char **argv) {
