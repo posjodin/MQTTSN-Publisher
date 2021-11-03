@@ -7,6 +7,7 @@ typedef enum {
     MQTTSN_NOT_CONNECTED,
     MQTTSN_CONNECTED,
     MQTTSN_PUBLISHING,
+    MQTTSN_LINGER,
     MQTTSN_DISCONNECTED,
 } mqttsn_state_t;
 
@@ -67,6 +68,10 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #define MQTTSN_MAX_TOPICS 8
 #endif /* MQTTSN_MAX_TOPICS */
 
+#ifndef MQTTSN_MAX_SUBSCRIPTIONS
+#define MQTTSN_MAX_SUBSCRIPTIONS 1
+#endif /* MQTTSN_MAX_SUBSCRIPTIONS */
+
 void mqttsn_publisher_init(void);
 
 int get_nodeid(char *buf, size_t size);
@@ -80,8 +85,8 @@ int mqpub_discon(void);
 int mqpub_reset(void);
 size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix);
 size_t mqpub_init_basename(char *basename, size_t basenamelen, char *nodeid);
-
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
+int mqpub_start_subscription(char *topic, emcute_cb_t cb);
 
 void mqpub_report_ready(void);
 
