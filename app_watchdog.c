@@ -62,9 +62,9 @@ static EEMEM uint32_t ee_hash;
 
 static int read_eeprom(void) {
     eeprom_read_block(&perm_awd_stats, &ee_perm_awd_stats, sizeof(perm_awd_stats));
-    uint32_t ehash = eeprom_read_dword(&ee_hash);
+    uint32_t eehash = eeprom_read_dword(&ee_hash);
     uint32_t hash = dek_hash((uint8_t *) &perm_awd_stats, sizeof(perm_awd_stats));
-    return ehash == hash;
+    return eehash == hash;
 }
 
 /*
@@ -82,12 +82,12 @@ void app_watchdog_init(void) {
         perm_awd_stats.last_timestamp = 0;        
     }
     else {
-     uint32_t utime_sec = perm_awd_stats.last_timestamp/1000000;
-     uint32_t utime_msec = (perm_awd_stats.last_timestamp/1000) % 1000;
+      uint32_t utime_sec = perm_awd_stats.last_timestamp/US_PER_SEC;
+      uint32_t utime_msec = (perm_awd_stats.last_timestamp/MS_PER_SEC) % MS_PER_SEC;
 
-        printf("Read AWD. Restarts %" PRIu32 " tstamp %" PRIu32 ".%" PRIu32 "\n",
-               perm_awd_stats.restarts,
-               utime_sec, utime_msec);
+      printf("Read AWD. Restarts %" PRIu32 " tstamp %" PRIu32 ".%" PRIu32 "\n",
+             perm_awd_stats.restarts,
+             utime_sec, utime_msec);
     }
 }
 
@@ -96,7 +96,7 @@ void app_watchdog_init(void) {
  * sufficiently long since last recovery?
  */
 static int awd_should_recover(void) {
-    if (consec_fails > APP_WATCHDOG_MAX_CONSEC_FAILS) {
+    if (consec_fails > APP_WATCHDOG_CONSEC_FAILS) {
         uint32_t now = xtimer_now_usec();
         if ((now - last_recovery)/US_PER_SEC >= APP_WATCHDOG_MIN_RECOVERY_INTERVAL_SEC) {
             return 1;
@@ -107,7 +107,10 @@ static int awd_should_recover(void) {
 
 static void awd_restart(void) {
     perm_awd_stats.restarts++;
-    perm_awd_stats.last_timestamp = sync_get_unix_ticks64(xtimer_now_usec64());
+    uint64_t timestamp = xtimer_now_usec64();
+    if (sync_has_sync())
+        timestamp = sync_get_unix_ticks64(timestamp);
+    perm_awd_stats.last_timestamp = timestamp;
     update_eeprom();
     pm_reboot(); /* Bye */
 }
@@ -126,7 +129,12 @@ static void awd_recovery(void) {
 #endif /* APP_WATCHDOG_REBOOT_RECOVERIES */
     last_recovery = xtimer_now_usec();
 #ifdef MODULE_SIM7020
-    printf("Restart SIM7020\n");
+
+    uint64_t tstamp = xtimer_now_usec64();
+    if (sync_has_sync()) {
+        tstamp = sync_get_unix_ticks64(tstamp);
+    }
+    printf("Restart SIM7020, recovery %d\n", awd_stats.recovery);
     /* Restart module */
     sim7020_reset();
 #endif
@@ -156,8 +164,8 @@ int app_watchdog_report(uint8_t *buf, size_t len, uint8_t *finished,
      PUTFMT("{\"n\":\"noprogress\",\"u\":\"count\",\"v\":%" PRIu32 "},", awd_stats.noprogress);
      PUTFMT("{\"n\":\"recovery\",\"u\":\"count\",\"v\":%" PRIu32 "},", awd_stats.recovery);
      PUTFMT("{\"n\":\"restarts\",\"u\":\"count\",\"v\":%" PRIu32 "},", perm_awd_stats.restarts);
-     uint32_t utime_sec = perm_awd_stats.last_timestamp/1000000;
-     uint32_t utime_msec = (perm_awd_stats.last_timestamp/1000) % 1000;
+     uint32_t utime_sec = perm_awd_stats.last_timestamp/US_PER_SEC;
+     uint32_t utime_msec = (perm_awd_stats.last_timestamp/MS_PER_SEC) % MS_PER_SEC;
      PUTFMT("{\"n\":\"restart_time\",\"v\":%" PRIu32 ".%03" PRIu32 "}", utime_sec, utime_msec);
      PUTFMT("]}");
      RECORD_END(nread);

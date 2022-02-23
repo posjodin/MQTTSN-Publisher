@@ -1,16 +1,19 @@
 #ifndef APP_WATCHDOG_H
 
-#ifndef APP_WATCHDOG_MAX_CONSEC_FAILS
-#define APP_WATCHDOG_MAX_CONSEC_FAILS 4//8
-#endif /* APP_WATCHDOG_MAX_CONSEC_FAILS */
 
+/* Number of failed communications before recovery */
+#ifndef APP_WATCHDOG_CONSEC_FAILS
+#define APP_WATCHDOG_CONSEC_FAILS 16
+#endif /* APP_WATCHDOG_CONSEC_FAILS */
+
+/* Min interval between recoveries */
 #ifndef APP_WATCHDOG_MIN_RECOVERY_INTERVAL_SEC
-#define APP_WATCHDOG_MIN_RECOVERY_INTERVAL_SEC 120 //600
+#define APP_WATCHDOG_MIN_RECOVERY_INTERVAL_SEC 600
 #endif /* APP_WATCHDOG_MIN_RECOVERY_INTERVAL_SEC */
 
-/* Nuumber of recoveries before rebooting */
+/* Number of recoveries before rebooting */
 #ifndef APP_WATCHDOG_MAX_RECOVERIES
-#define APP_WATCHDOG_MAX_RECOVERIES 2
+#define APP_WATCHDOG_MAX_RECOVERIES 9
 #endif /* APP_WATCHDOG_MAX_RECOVERIES */
 
 void app_watchdog_init(void);

@@ -68,6 +68,7 @@ static char emcute_stack[THREAD_STACKSIZE_DEFAULT + 128];
 static char default_topicstr[MQPUB_TOPIC_LENGTH];
 static char default_basename[MQPUB_BASENAME_LENGTH];
 emcute_topic_t emcute_topic;
+static emcute_sub_t *subscriptions[MQTTSN_MAX_SUBSCRIPTIONS];
 
 static int client_id(char *id, int idlen, char *prefix) {
 
@@ -276,6 +277,23 @@ mqpub_topic_t *mqpub_reg_topic(char *topicstr) {
     return tp;
 }
 
+int mqpub_start_subscription(char *topic, emcute_cb_t cb) {
+    emcute_sub_t *sub = malloc(sizeof(emcute_sub_t));
+    if (sub == NULL)
+        return ENOMEM;
+    int i;
+    for (i = 0; i < MQTTSN_MAX_SUBSCRIPTIONS; i++) {
+        if (subscriptions[i] == NULL) {
+            subscriptions[i] = sub;
+            sub->topic.name = topic;
+            sub->cb = cb;
+            return 0;
+        }
+    }
+    return ENOMEM;
+}
+
+
 int mqpub_discon(void) {
     LEDON;
     int errno = emcute_discon();
@@ -347,8 +365,8 @@ void mqpub_report_ready(void) {
 
 static mqttsn_state_t state = MQTTSN_NOT_CONNECTED;
 
-static void _publish_all(void) {
-
+static void _publish_all(int subscribe) {
+    uint32_t linger = 0;
 again:
     while (1) {
         switch (state) {
@@ -388,11 +406,38 @@ again:
                 }
 
             } while (!finished);
-            mqpub_discon();
-            state = MQTTSN_DISCONNECTED;
-            return;
+            if (subscribe) {
+                emcute_sub_t **sub;
+                for (sub = &subscriptions[0]; sub <= &subscriptions[MQTTSN_MAX_SUBSCRIPTIONS-1]; sub++) {
+                    if (*sub) {
+                        if ((res = emcute_sub(*sub, EMCUTE_QOS_1)) < 0) {
+                            mqpub_reset();
+                            state = MQTTSN_NOT_CONNECTED;
+                            return;
+                        }
+                    }
+                }
+                linger = xtimer_now_usec();
+                state = MQTTSN_LINGER;
+            }
+            else {
+                mqpub_discon();
+                state = MQTTSN_DISCONNECTED;
+                return;
+            }
             break;
         }
+#define LINGER_SEC 6
+        case MQTTSN_LINGER:
+        {
+            uint32_t now = xtimer_now_usec();
+            if ((now - linger)/US_PER_SEC >= LINGER_SEC) {
+                mqpub_discon();
+                state = MQTTSN_DISCONNECTED;
+                return;
+            }
+        }
+        break;
         case MQTTSN_DISCONNECTED:
             state = MQTTSN_NOT_CONNECTED;
             continue;
@@ -456,7 +501,7 @@ static void *mqpub_thread(void *arg)
 
         switch (msg.type) {
         case MSG_EVT_ASYNC:
-            _publish_all();
+            _publish_all(0);
             break;
         case MSG_EVT_PERIODIC:
 #ifdef SNTP_SYNC
@@ -466,7 +511,7 @@ static void *mqpub_thread(void *arg)
             dns_resolve_refresh();
 #endif /* DNS_CACHE_REFRESH */
             if (timeforperiodic()) {
-                _publish_all();
+                _publish_all(1);
                 xtimer_now_timex(&last_periodic);
             }
             else 
@@ -582,6 +627,8 @@ int mqttsn_stats_cmd(int argc, char **argv) {
           break;
       case MQTTSN_PUBLISHING:
           puts("publishing");
+      case MQTTSN_LINGER:
+          puts("linger");
       case MQTTSN_DISCONNECTED:
           puts("disconnected");
     }
