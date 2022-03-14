@@ -16,6 +16,9 @@
 #define APP_WATCHDOG_MAX_RECOVERIES 9
 #endif /* APP_WATCHDOG_MAX_RECOVERIES */
 
+/* Define to have a separate thread to trigger watchdog check */
+#define APP_WATCHDOG_THREAD
+
 void app_watchdog_init(void);
 void app_watchdog_update(int progress);
 int app_watchdog_report(uint8_t *buf, size_t len, uint8_t *finished, char **topicp, char **basenamep);

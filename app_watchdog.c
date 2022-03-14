@@ -53,6 +53,15 @@ static perm_awd_stats_t perm_awd_stats;
 static EEMEM perm_awd_stats_t ee_perm_awd_stats;
 static EEMEM uint32_t ee_hash;
 
+#ifdef APP_WATCHDOG_THREAD
+#define APPWD_PROBE_INTERVAL (5*SEC_PER_MIN)
+#define APPWD_PRIO  2
+#define APPWD_STACK THREAD_STACKSIZE_MAIN
+
+static char appwd_stack[APPWD_STACK];
+static void *appwd_thread(void *arg);
+#endif /* APPWD_THREAD */
+
 /*
  * Read DNS cache from EEPROM. Use a hash in EEPROM to verify that the info in the
  * EEPROM is valid. Read info, compute hash, and compare with
@@ -89,6 +98,11 @@ void app_watchdog_init(void) {
              perm_awd_stats.restarts,
              utime_sec, utime_msec);
     }
+#ifdef APP_WATCHDOG_THREAD
+    kernel_pid_t appwd_pid = thread_create(appwd_stack, sizeof(appwd_stack), APPWD_PRIO, THREAD_CREATE_STACKTEST,
+                              appwd_thread, NULL, "appwd");
+    printf("start appdw: pid %d\n", appwd_pid);
+#endif /* APP_WATCHDOG_THREAD */
 }
 
 /*
@@ -152,6 +166,20 @@ void app_watchdog_update(int progress) {
     }
 }
 
+#ifdef APP_WATCHDOG_THREAD
+static void *appwd_thread(__attribute__((unused)) void *arg)
+{
+    while (1) {
+        xtimer_sleep(APPWD_PROBE_INTERVAL);
+        if (consec_fails > 0)
+            printf("APPWD_THREAD: %d fails\n", consec_fails+1);
+        app_watchdog_update(0);
+        printf("APPWD %d\n", consec_fails);
+    }
+    return NULL;
+}
+#endif /* APPWD_THREAD */
+ 
 int app_watchdog_report(uint8_t *buf, size_t len, uint8_t *finished, 
                         __attribute__((unused)) char **topicp, __attribute__((unused)) char **basenamep) {
      char *s = (char *) buf;
