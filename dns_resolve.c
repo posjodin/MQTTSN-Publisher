@@ -61,6 +61,11 @@ static void update_eeprom(void) {
     eeprom_update_dword(&ee_hash, hash);
 }
 
+
+static int valid_address(ipv6_addr_t *addr) {
+    return ipv6_addr_is_ipv4_mapped(addr);
+}
+
 /*
  * Init cache. Read from EEPROM. If EEPROM info is not valid, mark all places as unused.
  * Cache will be written back to EEPROM when it is updated.
@@ -68,6 +73,7 @@ static void update_eeprom(void) {
 void dns_resolve_init(void) {
     dns_cache_t *dc;
     if (read_eeprom() == 0) {
+      printf("DNS cache not update\n");
         for (dc = &dns_resolve_cache[0]; dc <= &dns_resolve_cache[DNS_CACHE_SIZE-1]; dc++) {
             dc->state = UNUSED;
         }
@@ -76,9 +82,13 @@ void dns_resolve_init(void) {
         printf("DNS cache: ");
         for (dc = &dns_resolve_cache[0]; dc <= &dns_resolve_cache[DNS_CACHE_SIZE-1]; dc++) {
             if (dc->state == RESOLVED) {
-                printf("%s: ", dc->host);
-                ipv6_addr_print(&dc->ipv6addr);
-                printf(" ");
+                if (valid_address(&dc->ipv6addr)) {
+                    printf("%s: ", dc->host);
+                    ipv6_addr_print(&dc->ipv6addr);
+                    printf(" ");
+                }
+                else
+                    dc->state = UNUSED;
             }
         }
         printf("\n");
@@ -187,6 +197,7 @@ int dns_resolve_inetaddr(char *host, ipv6_addr_t *result) {
  * We do not want to be stuck in here too long, so only
  * update one entry at a time.
  */
+
 void dns_resolve_refresh(void) {
     dns_cache_t *dc;
     for (dc = &dns_resolve_cache[0]; dc <= &dns_resolve_cache[DNS_CACHE_SIZE-1]; dc++) {
