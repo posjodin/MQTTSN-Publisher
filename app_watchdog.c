@@ -55,8 +55,9 @@ static EEMEM uint32_t ee_hash;
 
 #ifdef APP_WATCHDOG_THREAD
 #define APPWD_PROBE_INTERVAL (5*SEC_PER_MIN)
-#define APPWD_PRIO  2
-#define APPWD_STACK THREAD_STACKSIZE_MAIN
+#define APPWD_PRIO  (THREAD_PRIORITY_MIN - \
+                     (SCHED_PRIO_LEVELS - 1))
+#define APPWD_STACK THREAD_STACKSIZE_SMALL
 
 static char appwd_stack[APPWD_STACK];
 static void *appwd_thread(void *arg);

@@ -13,7 +13,7 @@
 
 /* Number of recoveries before rebooting */
 #ifndef APP_WATCHDOG_MAX_RECOVERIES
-#define APP_WATCHDOG_MAX_RECOVERIES 9
+#define APP_WATCHDOG_MAX_RECOVERIES 5 //9
 #endif /* APP_WATCHDOG_MAX_RECOVERIES */
 
 /* Define to have a separate thread to trigger watchdog check */
