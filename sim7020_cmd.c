@@ -184,20 +184,11 @@ int sim7020cmd_send(int argc, char **argv) {
   return res;
 }
 
+int sim7020_test(void);
 int sim7020cmd_test(int argc, char **argv) {
-  uint8_t sockid;
-  int count;
-  
-  if (argc < 2) {
-    printf("Usage: %s sockid [count]\n", argv[0]);
-    return 1;
-  }
-  sockid = atoi(argv[1]);
-  if (argc == 3)
-    count = atoi(argv[2]);
-  else
-    count = -1;
-  int res = sim7020_test(sockid, count);
+  (void) argc; (void) argv;
+
+  int res = sim7020_test();
   if (res < 0)
     printf("Error %d\n", res);
   else
