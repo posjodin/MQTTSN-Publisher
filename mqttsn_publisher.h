@@ -60,7 +60,7 @@ mqttsn_state_t mqttsn_publisher_state(void);
 
 #ifndef MQTTSN_PUBLISH_INTERVAL
 /* Period publish interval (seconds) */
-#define MQTTSN_PUBLISH_INTERVAL 600 //1200
+#define MQTTSN_PUBLISH_INTERVAL 30//600 //1200
 #endif /* MQTTSN_PUBLISH_INTERVAL */
 
 #ifndef MQTTSN_MAX_TOPICS

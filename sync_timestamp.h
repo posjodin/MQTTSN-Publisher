@@ -19,7 +19,7 @@
  * Time between sync refresh
  */
 #ifndef SYNC_INTERVAL_SECONDS
-#define SYNC_INTERVAL_SECONDS 3600
+#define SYNC_INTERVAL_SECONDS 60//3600
 #endif /* SYNC_INTERVAL_SECONDS */
 
 /*

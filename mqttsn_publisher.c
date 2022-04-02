@@ -510,8 +510,8 @@ static void *mqpub_thread(void *arg)
 #ifdef DNS_CACHE_REFRESH
             dns_resolve_refresh();
 #endif /* DNS_CACHE_REFRESH */
-            if (timeforperiodic()) {
-                _publish_all(1);
+            if (0 && timeforperiodic()) {
+                _publish_all(0/*1*/);
                 xtimer_now_timex(&last_periodic);
             }
             else 

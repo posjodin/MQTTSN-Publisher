@@ -197,6 +197,7 @@ int sim7020cmd_test(int argc, char **argv) {
     count = atoi(argv[2]);
   else
     count = -1;
+  int sim7020_test(uint8_t, int);
   int res = sim7020_test(sockid, count);
   if (res < 0)
     printf("Error %d\n", res);
