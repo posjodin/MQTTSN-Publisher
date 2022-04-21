@@ -8,7 +8,6 @@ BOARD ?= avr-rss2
 #RIOTBASE ?= $(CURDIR)/../../RIOT-OS
 RIOTBASE ?= $(CURDIR)/../../../../../../RIOT-OS/
 
-
 # Network stack to use - sim7020 or gnrc
 NETSTACK ?= sim7020
 
@@ -39,6 +38,11 @@ CFLAFS += DMQTTSN_GATEWAY_PORT=10000
 
 USEMODULE += emcute
 CFLAGS += -DEMCUTE_ID=\"rpl-857b\"
+
+# Use SNTP for global timestamps
+USEMODULE += sntp
+USEMODULE += gnrc_netif
+USEMODULE += gnrc_netapi
 
 ifeq ($(NETSTACK), sim7020)
   USEMODULE += sim7020_sock_udp
