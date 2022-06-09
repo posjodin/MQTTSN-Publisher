@@ -97,7 +97,8 @@ int sim7020cmd_stats(int argc, char **argv) {
       printf("prev_duration: %" PRIu32 "\n", (uint32_t) (sim7020_prev_active_duration_usecs/1000));
     }
   }
-
+  extern uint32_t longest_send;
+  printf("Longest send %" PRIu32 "\n", longest_send);
 
   return 0;
 }
