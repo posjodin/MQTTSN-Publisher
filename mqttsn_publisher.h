@@ -55,7 +55,11 @@ mqttsn_state_t mqttsn_publisher_state(void);
 #endif /* MQTTSN_GATEWAY_PORT */
 
 #ifndef MQTTSN_BUFFER_SIZE
-#define MQTTSN_BUFFER_SIZE (EMCUTE_BUFSIZE-16)
+#if defined(CONFIG_EMCUTE_BUFSIZE)
+#define MQTTSN_BUFFER_SIZE (CONFIG_EMCUTE_BUFSIZE - 16)
+#elif defined(EMCUTE_BUFSIZE)
+#define MQTTSN_BUFFER_SIZE (EMCUTE_BUFSIZE - 16)
+#endif /* defined(CONFIG_EMCUTE_BUFSIZE) */
 #endif  /* MQTTSN_BUFFER_SIZE */
 
 #ifndef MQTTSN_PUBLISH_INTERVAL
