@@ -30,7 +30,9 @@
 #include "pstr_print.h"
 #endif
 #include "periph/pm.h"
-
+#ifdef WDT_WATCHDOG
+#include "periph/wdt.h"
+#endif
 #include "report.h"
 #include "sync_timestamp.h"
 
@@ -54,14 +56,21 @@ static EEMEM perm_awd_stats_t ee_perm_awd_stats;
 static EEMEM uint32_t ee_hash;
 
 #ifdef APP_WATCHDOG_THREAD
-#define APPWD_PROBE_INTERVAL (5*SEC_PER_MIN)
+#define APPWD_THREAD_PERIOD_SEC 2
+#define APPWD_UPDATE_INTERVAL_SEC (5*SEC_PER_MIN)
 #define APPWD_PRIO  (THREAD_PRIORITY_MIN - \
                      (SCHED_PRIO_LEVELS - 1))
 #define APPWD_STACK THREAD_STACKSIZE_SMALL
 
 static char appwd_stack[APPWD_STACK];
 static void *appwd_thread(void *arg);
+
 #endif /* APPWD_THREAD */
+
+#ifdef WDT_WATCHDOG
+#define WDT_MAX_MSEC 8000
+#define WDT_PERIOD_MSEC 1000
+#endif
 
 /*
  * Read DNS cache from EEPROM. Use a hash in EEPROM to verify that the info in the
@@ -104,6 +113,10 @@ void app_watchdog_init(void) {
                               appwd_thread, NULL, "appwd");
     printf("start appdw: pid %d\n", appwd_pid);
 #endif /* APP_WATCHDOG_THREAD */
+#ifdef WDT_WATCHDOG
+    wdt_setup_reboot(0, WDT_MAX_MSEC);
+    wdt_start();
+#endif /* WDT_WATCHDOG */
 }
 
 /*
@@ -170,12 +183,20 @@ void app_watchdog_update(int progress) {
 #ifdef APP_WATCHDOG_THREAD
 static void *appwd_thread(__attribute__((unused)) void *arg)
 {
+  unsigned int periods = 0;
     while (1) {
-        xtimer_sleep(APPWD_PROBE_INTERVAL);
-        if (consec_fails > 0)
+        xtimer_sleep(APPWD_THREAD_PERIOD_SEC);
+
+#ifdef WDT_WATCHDOG
+        wdt_kick();
+#endif /* WDT_WATCHDOG */
+        if (periods++ >= APPWD_UPDATE_INTERVAL_SEC/APPWD_THREAD_PERIOD_SEC) {
+          periods = 0;
+          if (consec_fails > 0)
             printf("APPWD_THREAD: %d fails\n", consec_fails+1);
-        app_watchdog_update(0);
-        printf("APPWD %d\n", consec_fails);
+          app_watchdog_update(0);
+          printf("APPWD %d\n", consec_fails);
+        }
     }
     return NULL;
 }
