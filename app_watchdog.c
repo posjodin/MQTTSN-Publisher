@@ -133,6 +133,13 @@ static int awd_should_recover(void) {
     return 0;
 }
 
+static void awd_reboot(void) {
+    wdt_setup_reboot(0, 500 /* msec */);
+    wdt_start();
+    irq_disable();
+    while(1);
+}
+
 static void awd_restart(void) {
     perm_awd_stats.restarts++;
     uint64_t timestamp = xtimer_now_usec64();
@@ -140,7 +147,7 @@ static void awd_restart(void) {
         timestamp = sync_get_unix_ticks64(timestamp);
     perm_awd_stats.last_timestamp = timestamp;
     update_eeprom();
-    pm_reboot(); /* Bye */
+    awd_reboot(); /* bye */
 }
 
 /*
