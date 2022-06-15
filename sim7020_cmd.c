@@ -219,3 +219,7 @@ int sim7020cmd_reset(int argc, char **argv) {
     return sim7020_reset();
 }
 
+int sim7020cmd_stop(int argc, char **argv) {
+    (void) argc; (void) argv;
+    return sim7020_stop();
+}
