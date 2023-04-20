@@ -134,10 +134,12 @@ static int awd_should_recover(void) {
 }
 
 static void awd_reboot(void) {
+#ifdef WDT_WATCHDOG
     wdt_setup_reboot(0, 500 /* msec */);
     wdt_start();
     irq_disable();
     while(1);
+#endif /* WDT_WATCHDOG */
 }
 
 static void awd_restart(void) {
