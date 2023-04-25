@@ -1,0 +1,3 @@
+[submodule "simping/RIOT-OS"]
+	path = simping/RIOT-OS
+	url = https://github.com/posjodin/RIOT.git
