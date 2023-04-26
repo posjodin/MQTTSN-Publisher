@@ -9,7 +9,7 @@ BOARD ?= avr-rss2
 _RIOT_VERSION=RIOT20
 
 # This has to be the absolute path to the RIOT base directory:
-RIOTBASE ?= $(CURDIR)/../../RIOT-OS/
+RIOTBASE ?= $(CURDIR)/../RIOT-OS
 
 ifeq ($(_RIOT_VERSION), RIOT20)
   CFLAGS += -Datmega_reset_cause=_reset_cause

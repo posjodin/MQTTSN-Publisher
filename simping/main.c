@@ -27,7 +27,6 @@
 #ifdef MODULE_NETIF
 #include "net/gnrc.h"
 #endif
-
 #ifndef SHELL_BUFSIZE
 #define SHELL_BUFSIZE       (128U)
 #endif
@@ -49,6 +48,7 @@ int sim7020cmd_stats(int argc, char **argv);
 int sim7020cmd_at(int argc, char **argv);
 int sim7020cmd_stop(int argc, char **argv);
 int sim7020cmd_reset(int argc, char **argv);
+int cmd_sim7020_conf(int argc, char **argv);
 #endif /* MODULE_SIM7020 */
 #ifdef UPING
 int cmd_uping(int argc, char **argv);
@@ -62,6 +62,7 @@ static const shell_command_t shell_commands[] = {
     { "at", "Send AT string to SIM7020", sim7020cmd_at },
     { "reset", "Reset SIM7020", sim7020cmd_reset },
     { "stop", "Stop SIM7020", sim7020cmd_stop },
+    { "sim", "Configure SIM7020", cmd_sim7020_conf},
 #endif /* MODULE_SIM7020 */
 #ifdef UPING
     {"uping", "UDP ping", cmd_uping},
