@@ -69,7 +69,7 @@ ifeq ($(NETSTACK), sim7020)
   ifeq ($(USE_DNS), true)
     USEMODULE += sim7020_sock_dns
   endif
-  USEMODULE += auto_init_sim7020
+#  USEMODULE += auto_init_sim7020
   CFLAGS += -DCONFIG_AT_SEND_SKIP_ECHO=1
   USEMODULE += netstats_l2
 endif

@@ -30,6 +30,14 @@
 #ifndef SHELL_BUFSIZE
 #define SHELL_BUFSIZE       (128U)
 #endif
+
+#include "net/af.h"
+#include "net/ipv4/addr.h"
+#include "net/ipv6/addr.h"
+#include "net/sock/udp.h"
+
+#include "net/sim7020.h"
+
 kernel_pid_t me;
  
 extern kernel_pid_t rime_pid;
@@ -80,6 +88,7 @@ int main(void)
     me = thread_getpid();
     printf("main pid=%u\n", me);
 
+    sim7020_init();
     char line_buf[SHELL_BUFSIZE];
     shell_run(shell_commands, line_buf, SHELL_BUFSIZE);
 }
