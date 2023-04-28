@@ -51,4 +51,5 @@ Then run the `uping` command in the RIOT command shell:
 > uping <hostname> <port number> <count>
 ```
 
+Uping is located in the parent directory of this directory.
 
