@@ -5,11 +5,12 @@ APPLICATION = mqttsn_publisher
 BOARD ?= avr-rss2
 
 # This has to be the absolute path to the RIOT base directory:
-#RIOTBASE ?= $(CURDIR)/../../RIOT-OS
-RIOTBASE ?= $(CURDIR)/../../../../../../RIOT-OS/
+RIOTBASE ?= $(CURDIR)/../RIOT-OS
+#RIOTBASE ?= $(CURDIR)/../../../../../../RIOT-OS/
 
 # Network stack to use - sim7020 or gnrc
 NETSTACK ?= sim7020
+CFLAGS += -DSIM7000G
 
 # MQTT-SN publisher config
 #
@@ -22,18 +23,18 @@ CFLAGS += -DMQTTSN_PUBLISHER_THREAD
 # Autolauch at startup
 CFLAGS += -DAUTO_INIT_MQTTSN
 # Use DNS to lookup host names
-USE_DNS ?= false
+USE_DNS ?= true
 # Use SNTP to syncrhonize clocks
 CFLAGS += -DSNTP_SYNC
 # MQTT-SN gateway
 # lxc-ha IPv6 static ULA:
-CFLAGS += -DMQTTSN_GATEWAY_HOST=\"fd95:9bba:768f:0:216:3eff:fec6:99db\" 
+#CFLAGS += -DMQTTSN_GATEWAY_HOST=\"fd95:9bba:768f:0:216:3eff:fec6:99db\" 
 #minime.sjodin.net:
 #CFLAGS += -DMQTTSN_GATEWAY_HOST=\"::ffff:82ed:ca25\"
 #lab-pc.ssvl.kth.se
 #CFLAGS += -DMQTTSN_GATEWAY_HOST=\"::ffff:c010:7de8\"
 #CFLAGS += -DMQTTSN_GATEWAY_HOST=\"2001:6b0:32:13::232\"
-#CFLAGS += -DMQTTSN_GATEWAY_HOST=\"lab-pc.ssvl.kth.se\"
+CFLAGS += -DMQTTSN_GATEWAY_HOST=\"lab-pc.ssvl.kth.se\"
 CFLAFS += DMQTTSN_GATEWAY_PORT=10000
 
 USEMODULE += emcute
@@ -45,11 +46,13 @@ USEMODULE += gnrc_netif
 USEMODULE += gnrc_netapi
 
 ifeq ($(NETSTACK), sim7020)
+  USEMODULE += async_at
   USEMODULE += sim7020_sock_udp
   ifeq ($(USE_DNS), true)
     USEMODULE += sim7020_sock_dns
   endif
   USEMODULE += auto_init_sim7020
+  CFLAGS += -DCONFIG_AT_SEND_SKIP_ECHO=1
 else ifeq ($(NETSTACK), gnrc)
   ifeq ($(USE_DNS), true)
     USEMODULE += sock_dns
@@ -87,6 +90,8 @@ USEMODULE += netstats_ipv6
 USEMODULE += netstats_rpl
 endif
 USEMODULE += xtimer
+USEMODULE += hashes
+USEMODULE += timex
 USEMODULE += at24mac
 
 ifeq ($(NETSTACK), sim7020)
