@@ -15,6 +15,7 @@
 #include "net/ipv4/addr.h"
 #include "net/ipv6/addr.h"
 #include "net/sock/udp.h"
+#include "mqttsn_publisher.h"
 
 #include "periph/uart.h"
 
@@ -165,6 +166,16 @@ int sim7020cmd_connect(int argc, char **argv) {
     else
         printf("OK");
     return res;
+}
+
+int sim7020cmd_topic(int argc, char **argv) {
+  printf("argv[1]: %s\nargv[2]: %s\nargv[3]: %s\n", argv[1], argv[2], argv[3]);
+  printf("atoi: %d", atoi(argv[3]));
+  if (argc < 4) {
+      printf("Usage: %s topicstr data len\n", argv[0]);
+      return 1;
+  }
+  return mqpub_pubtopic(argv[1], (uint8_t*) argv[2], atoi(argv[3]));
 }
 
 int sim7020cmd_send(int argc, char **argv) {
