@@ -90,6 +90,8 @@ int mqpub_reset(void);
 size_t mqpub_init_topic(char *topic, size_t topiclen, char *nodeid, char *suffix);
 size_t mqpub_init_basename(char *basename, size_t basenamelen, char *nodeid);
 int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen);
+int mqpub_pub_100_fast(char *topicstr);
+int mqpub_pub_every_10th(char *topicstr);
 int mqpub_start_subscription(char *topic, emcute_cb_t cb);
 
 void mqpub_report_ready(void);

@@ -46,6 +46,8 @@ int sim7020cmd_at(int arg, char **argv);
 int sim7020cmd_recv(int arg, char **argv);
 int sim7020cmd_reset(int arg, char **argv);
 int sim7020cmd_topic(int arg, char **argv);
+int sim7020cmd_100_fast(int arg, char **argv);
+int sim7020cmd_every_10th(int arg, char **argv);
 #endif /* MODULE_SIM7020 */
 
 static const shell_command_t shell_commands[] = {
@@ -64,6 +66,8 @@ static const shell_command_t shell_commands[] = {
     { "utest", "repeat usend", sim7020cmd_test },                
     { "at", "run AT command, for example \"at AT+CSQ\"", sim7020cmd_at },
     { "topic", "send topic", sim7020cmd_topic },
+    { "fast100", "send 100 times", sim7020cmd_100_fast },
+    { "every10th", "send every 10th minute", sim7020cmd_every_10th },
 #endif /* MODULE_SIM7020 */
 #ifdef MODULE_MQTTSN_PUBLISHER
     { "mqstat", "print MQTT status", mqttsn_stats_cmd},

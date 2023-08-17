@@ -178,6 +178,24 @@ int sim7020cmd_topic(int argc, char **argv) {
   return mqpub_pubtopic(argv[1], (uint8_t*) argv[2], atoi(argv[3]));
 }
 
+int sim7020cmd_100_fast(int argc, char **argv) {
+  printf("argv[1]: %s\n", argv[1]);
+  if (argc < 2) {
+      printf("Usage: %s topicstr\n", argv[0]);
+      return 1;
+  }
+  return mqpub_pub_100_fast(argv[1]);
+}
+
+int sim7020cmd_every_10th(int argc, char **argv) {
+  printf("argv[1]: %s\n", argv[1]);
+  if (argc < 2) {
+      printf("Usage: %s topicstr\n", argv[0]);
+      return 1;
+  }
+  return mqpub_pub_every_10th(argv[1]);
+}
+
 int sim7020cmd_send(int argc, char **argv) {
   uint8_t sockid;
   char *data;

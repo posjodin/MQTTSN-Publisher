@@ -339,6 +339,62 @@ int mqpub_pubtopic(char *topicstr, uint8_t *data, size_t datalen) {
     return res;
 }
 
+/*
+ * One-stop publishing x100 -- connect, register topic, publish, disconnect, sleep, repeat
+ */
+int mqpub_pub_100_fast(char *topicstr) {
+    int res;
+    mqpub_topic_t topic;
+    char data[4];
+    size_t datalen = 4;
+
+    for (uint8_t i = 0; i < 100; i++) {
+        sprintf(data, "%03d", i);
+        res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+        //printf("*con %d\n", res);
+        if (res != 0)
+            return res;
+        res = mqpub_reg(&topic, topicstr);
+        //printf("*reg %d\n", res);
+        if (res != 0)
+            return res;
+        res = mqpub_pub(&topic, data, datalen);
+        //printf("*pub %d\n", res);
+        mqpub_reset();
+        xtimer_sleep(1);
+    }
+
+    return res;
+}
+
+/*
+ * One-stop publishing every 10 minute -- connect, register topic, publish, disconnect, sleep 10 minutes, repeat
+ */
+int mqpub_pub_every_10th(char *topicstr) {
+    int res;
+    mqpub_topic_t topic;
+    char data[4];
+    size_t datalen = 4;
+
+    for (uint8_t i = 0; i < 100; i++) {
+        sprintf(data, "%03d", i);
+        res = mqpub_con(MQTTSN_GATEWAY_HOST, MQTTSN_GATEWAY_PORT);
+        //printf("*con %d\n", res);
+        if (res != 0)
+            return res;
+        res = mqpub_reg(&topic, topicstr);
+        //printf("*reg %d\n", res);
+        if (res != 0)
+            return res;
+        res = mqpub_pub(&topic, data, datalen);
+        //printf("*pub %d\n", res);
+        mqpub_reset();
+        xtimer_sleep(600);
+    }
+
+    return res;
+}
+
 #ifdef MQTTSN_PUBLISHER_THREAD
 
 enum {
