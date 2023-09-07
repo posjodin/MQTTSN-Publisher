@@ -11,12 +11,12 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "shell.h"
+
 #include "net/af.h"
 #include "net/ipv4/addr.h"
 #include "net/ipv6/addr.h"
 #include "net/sock/udp.h"
-
-#include "periph/uart.h"
 
 #include "net/sim7020.h"
 
