@@ -50,12 +50,6 @@ static int cmd_upgr(__attribute__((unused)) int ac, __attribute__((unused)) char
 }
 
 #ifdef MODULE_SIM7020
-int sim7020cmd_init(int argc, char **argv);
-int sim7020cmd_status(int argc, char **argv);
-int sim7020cmd_stats(int argc, char **argv);
-int sim7020cmd_at(int argc, char **argv);
-int sim7020cmd_stop(int argc, char **argv);
-int sim7020cmd_reset(int argc, char **argv);
 int sim7020cmd_conf(int argc, char **argv);
 void sim7020_conf_init(void);
 #endif /* MODULE_SIM7020 */
@@ -65,13 +59,7 @@ int cmd_uping(int argc, char **argv);
 
 static const shell_command_t shell_commands[] = {
 #ifdef MODULE_SIM7020
-    { "init", "Init SIM7020", sim7020cmd_init },
-    { "stats", "SIM7020 statistics", sim7020cmd_stats },
-    { "status", "Report SIM7020 status", sim7020cmd_status },
-    { "at", "Send AT string to SIM7020", sim7020cmd_at },
-    { "reset", "Reset SIM7020", sim7020cmd_reset },
-    { "stop", "Stop SIM7020", sim7020cmd_stop },
-    { "sim", "Configure SIM7020", sim7020cmd_conf},
+    { "sim", "Manage SIM7020", sim7020cmd_conf},
 #endif /* MODULE_SIM7020 */
 #ifdef UPING
     {"uping", "UDP ping", cmd_uping},

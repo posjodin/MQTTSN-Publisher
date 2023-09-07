@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 Peter Sjödin, KTH
+ * Copyright (C) 2023 Peter Sjödin, KTH
  *
  * This file is subject to the terms and conditions of the GNU Lesser
  * General Public License v2.1. See the file LICENSE in the top level
@@ -9,69 +9,174 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdint.h>
+#include <ctype.h>
+#include <errno.h>
 
-#include "shell.h"
+#include <avr/eeprom.h>
 
 #include "net/af.h"
 #include "net/ipv4/addr.h"
 #include "net/ipv6/addr.h"
 #include "net/sock/udp.h"
 
+#include "async_at.h"
+#include "xtimer.h"
+#include "cond.h"
+#include "periph/uart.h"
+#include "shell.h"
+
 #include "net/sim7020.h"
 
-int sim7020cmd_init(int argc, char **argv) {
-  
-  (void) argc; (void) argv;
+#ifdef BOARD_AVR_RSS2
+#include "pstr_print.h"
+#endif
 
-  //int res = sim7020_init(UART_DEV(1), 9600);
-  int res = sim7020_init();  
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-    printf("OK");
-  return res;
+#include "eedata.h"
+
+sim7020_conf_t conf = {
+    .flags = SIM7020_CONF_FLAGS_DEFAULT,
+    .apn = "4g.tele2.se",
+    .operator = "24007"
+};
+
+static EEMEM struct {
+    eehash_t ee_hash;
+    sim7020_conf_t ee_conf;
+} ee_data;
+
+    
+#include <string.h>
+#include "hashes.h"
+
+static void printconf(void) {
+    printf("apn: %s\n", (conf.flags & SIM7020_CONF_MANUAL_APN) ? conf.apn : "auto");
+    printf("operator: %s\n", (conf.flags & SIM7020_CONF_MANUAL_OPERATOR) ? conf.operator : "auto");
 }
 
-int sim7020cmd_register(int argc, char **argv) {
-  
-  (void) argc; (void) argv;
-
-  int res = sim7020_register();
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-    printf("OK");
-  return res;
+static inline void _apply(void) {
+    sim7020_setconf(&conf);
 }
 
-int sim7020cmd_activate(int argc, char **argv) {
-  
-  (void) argc; (void) argv;
-
-  int res = sim7020_activate();
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-    printf("OK");
-  return res;
-}
-  
-int sim7020cmd_status(int argc, char **argv) {
-  
-  (void) argc; (void) argv;
-
-  int res = sim7020_status();
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-    printf("OK");
-  return res;
+void sim7020_conf_init(void) {
+    sim7020_conf_t confdata;
+    int n = read_eeprom(&confdata, &ee_data, sizeof(confdata));
+    if (n != 0) {
+        memcpy(&conf, &confdata, sizeof(conf));
+        printf("Apply SIM config: \n");
+        printconf();
+        _apply();
+    }
+    else {
+      printf("No SIM config\n");
+    }
 }
 
-int sim7020cmd_stats(int argc, char **argv) {
+static int cmd_apn(int argc, char **argv) {
+    if (argc == 2) {
+        int sim7020_apn(char *buf, int len);
+        char apn[32];
+        int res = sim7020_apn(apn, sizeof(apn));
+        if (res != 0)
+            printf("%s\n", apn);
+        return res != 0;
+    }
+    else {
+        if (strcmp(argv[2], "auto") == 0) {
+            /* Toggle manual flag */
+            conf.flags ^= SIM7020_CONF_MANUAL_APN;
+        }
+        else {
+            strncpy(conf.apn, argv[2], sizeof(conf.apn));
+            conf.flags |= SIM7020_CONF_MANUAL_APN;
+        }
+        update_eeprom(&conf, &ee_data, sizeof(conf));
+        _apply();
+        return 1;
+    }
+}
+
+static int cmd_operator(int argc, char **argv) {
+    if (argc == 2) {
+        char operator[32];
+        int res = sim7020_operator(operator, sizeof(operator));
+        if (res != 0)
+            printf("%s\n", operator);
+        return res != 0;
+
+    }
+    else {
+        if (strcmp(argv[2], "auto") == 0) {
+            /* Toggle manual flag */
+            conf.flags ^= SIM7020_CONF_MANUAL_OPERATOR;
+        }
+        else {
+            strncpy(conf.operator, argv[2], sizeof(conf.operator));
+            conf.flags |= SIM7020_CONF_MANUAL_OPERATOR;
+        }
+        update_eeprom(&conf, &ee_data, sizeof(conf));
+        _apply();
+        return 1;
+    }
+}
+
+static int cmd_scan(__attribute__((unused)) int argc, __attribute__((unused)) char **argv) {
+    sim7020_operator_t op;
+    int first = 1;
+
+    while (sim7020_scan(&op, first) != 0) {
+        first = 0;
+        /* 
+         * Status symbols: '?' - unknown (0), <space> - available (1), 
+         * '*' - current (2), '-' - unavailable (3)
+         */
+        char *statsym = "? *-"; 
+        char stat = statsym[op.stat];
+                
+        /*
+         * Netact: 0 - User-specified GSM, 1 - GSM compact, 3 - EGPRS, 7 - Cat-M, 9 - NB-IoT 
+         */
+        printf("%c%s: %s (%d)\n", stat, op.longname, op.numname, op.netact);
+    }
+    return 1;
+}
+
+//static int sim7020cmd_init(__attribute__((unused)) int argc, __attribute__((unused)) char **argv) {
+int cmd_init(int argc, char **argv) {
+    (void) argc; (void) argv;
+  return sim7020_init();  
+}
+
+static int cmd_reset(__attribute__((unused)) int argc, __attribute__((unused)) char **argv) {
+    return sim7020_reset();
+}
+
+static int cmd_stop(__attribute__((unused)) int argc, __attribute__((unused)) char **argv) {
+    return sim7020_stop();
+}
+
+static int cmd_at(int argc, char **argv) {
+    char cmd[256];
   
-  (void) argc; (void) argv;
+    uint8_t first = 1;
+    int i;
+    cmd[0] = '\0';
+    for (i = 1; i < argc; i++) {
+        if (first != 1) {
+            (void) strlcat(cmd, " ", sizeof(cmd));
+        }
+        else
+            first = 0;
+        (void) strlcat(cmd, argv[i], sizeof(cmd));
+    }
+    return sim7020_at(cmd);
+}
+
+static int cmd_status(__attribute__((unused)) int argc, __attribute__((unused)) char **argv) {
+  return sim7020_status();
+}
+
+static int cmd_stats(__attribute__((unused)) int argc, __attribute__((unused)) char **argv) {
+  
   sim7020_netstats_t *ns = sim7020_get_netstats();
 
   printf("tx_unicast_count: %" PRIu32 "\n", ns->tx_unicast_count);
@@ -103,123 +208,55 @@ int sim7020cmd_stats(int argc, char **argv) {
   return 0;
 }
 
-static void recv_callback(void *p, const uint8_t *data, uint16_t datalen) {
-    (void) p; (void) data;
-    printf("recv_callback: got %d bytes\n", datalen);
-}
+typedef struct sim_command {
+    const char *command;             /* Command */
+    const char *desc;                /* Command description for help command */
+    const char *param_help;          /* Parameter(s) description for help command */
+    shell_command_handler_t handler;         /* Handler function */
+} sim_command_t;
 
-int sim7020cmd_udp_socket(int argc, char **argv) {
-  
-(void) argc; (void) argv;
+static const sim_command_t sim_commands[] = {
+    { "init", "Init device", NULL, cmd_init },
+    { "stats", "Statistics", NULL, cmd_stats },
+    { "status", "Report status", NULL, cmd_status },
+    { "at", "Send string to device", "<string>", cmd_at },
+    { "reset", "Reset", NULL, cmd_reset },
+    { "stop", "Stop", NULL, cmd_stop },
+    { "apn", "Set APN",  "[<apn>|auto]", cmd_apn},
+    { "operator", "Set operator",  "[<operator>|auto]", cmd_operator},
+    { "scan", "Operator scan", NULL, cmd_scan },
 
-  int res = sim7020_udp_socket(recv_callback, NULL);
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-      printf("Socket %d", res);
-  return res;
-}
+    { NULL, NULL, NULL, NULL }
+};
 
-int sim7020cmd_close(int argc, char **argv) {
-  uint8_t sockid;
-  
-  if (argc != 2) {
-    printf("Usage: %s sockid\n", argv[0]);
-    return 1;
-  }
-  sockid = atoi(argv[1]);
-  int res = sim7020_close(sockid);
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-    printf("OK");
-  return res;
-}
-
-int sim7020cmd_connect(int argc, char **argv) {
-    uint8_t sockid;
-    sock_udp_ep_t remote;
-
-  
-    if (argc < 4) {
-        printf("Usage: %s sockid ipaddr port\n", argv[0]);
+#define MINMATCH 3
+int sim7020cmd_conf(int argc, char **argv) {
+    if (argc == 1) {
+        printconf();
         return 1;
     }
-    sockid = atoi(argv[1]);
 
-    remote.family = AF_INET6;
-    ipv6_addr_t *v6addr = (ipv6_addr_t *) remote.addr.ipv6;
-    /* Build ipv4-mapped address */
-    v6addr->u32[0].u32 = 0; v6addr->u32[1].u32 = 0;
-    v6addr->u16[4].u16 = 0; v6addr->u16[5].u16 = 0xffff;
-    if (NULL == ipv4_addr_from_str((ipv4_addr_t *) &v6addr->u32[3], argv[2])) {
-        printf("Usage: %s sockid ipaddr port\n", argv[0]);
-        return 1;
-    }
-    remote.netif = SOCK_ADDR_ANY_NETIF;
-    remote.port = atoi(argv[3]);
-    
-    int res = sim7020_connect(sockid, &remote);
-    if (res < 0)
-        printf("Error %d\n", res);
-    else
-        printf("OK");
-    return res;
-}
-
-int sim7020cmd_send(int argc, char **argv) {
-  uint8_t sockid;
-  char *data;
-  
-  if (argc < 3) {
-    printf("Usage: %s sockid data\n", argv[0]);
-    return 1;
-  }
-  sockid = atoi(argv[1]);
-  data = argv[2];
-  int res = sim7020_send(sockid, (uint8_t *) data, strlen(data));
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-    printf("OK");
-  return res;
-}
-
-int sim7020_test(void);
-int sim7020cmd_test(int argc, char **argv) {
-  (void) argc; (void) argv;
-
-  int res = sim7020_test();
-  if (res < 0)
-    printf("Error %d\n", res);
-  else
-    printf("OK");
-  return res;
-}
-
-int sim7020cmd_at(int argc, char **argv) {
-    char cmd[256];
-  
-    uint8_t first = 1;
-    int i;
-    cmd[0] = '\0';
-    for (i = 1; i < argc; i++) {
-        if (first != 1) {
-            (void) strlcat(cmd, " ", sizeof(cmd));
+    const sim_command_t *cmd;
+    for (cmd = &sim_commands[0]; cmd->command != NULL; cmd++) {
+        if (strcmp(cmd->command, argv[1]) == 0) {
+            return cmd->handler(argc, argv);
         }
-        else
-            first = 0;
-        (void) strlcat(cmd, argv[i], sizeof(cmd));
     }
-    return sim7020_at(cmd);
+    /* 
+     * Print help 
+     */
+    char *indent = "";
+    for (cmd = &sim_commands[0]; cmd->command != NULL; cmd++) {
+        int n = printf("%s%s", indent, cmd->command);
+        if (cmd->param_help)
+            n += printf(" %s", cmd->param_help);
+        int i = 40 - n;
+        while (i-- > 0)
+            putchar(' ');
+        printf("%s\n", cmd->desc);        
+    }
+    return -1;  
 }
 
-int sim7020cmd_reset(int argc, char **argv) {
-    (void) argc; (void) argv;
-    return sim7020_reset();
-}
 
-int sim7020cmd_stop(int argc, char **argv) {
-    (void) argc; (void) argv;
-    return sim7020_stop();
-}
+
