@@ -9,7 +9,7 @@ BOARD ?= avr-rss2
 _RIOT_VERSION=RIOT20
 
 # This has to be the absolute path to the RIOT base directory:
-RIOTBASE ?= $(CURDIR)/../RIOT-OS/
+RIOTBASE ?= $(CURDIR)/../RIOT-OS
 
 ifeq ($(_RIOT_VERSION), RIOT20)
   CFLAGS += -Datmega_reset_cause=_reset_cause
@@ -69,7 +69,7 @@ ifeq ($(NETSTACK), sim7020)
   ifeq ($(USE_DNS), true)
     USEMODULE += sim7020_sock_dns
   endif
-  USEMODULE += auto_init_sim7020
+#  USEMODULE += auto_init_sim7020
   CFLAGS += -DCONFIG_AT_SEND_SKIP_ECHO=1
   USEMODULE += netstats_l2
 endif
