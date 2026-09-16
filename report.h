@@ -53,7 +53,7 @@
    goto _notfull;                                                       \
   _full:                                                                \
     WARN("%s: %d: no space left\n", __FILE__, __LINE__);                \
-    *(_str) = '\0';                                                     \
+    if ((_str) != NULL && (_len) > 0) { *(_str) = '\0'; }               \
     return ((NREAD));                                                   \
   _notfull:                                                             \
   (NREAD) += _nread;                                                    \
