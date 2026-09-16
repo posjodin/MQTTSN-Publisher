@@ -112,7 +112,7 @@ static void _init_topics(void) {
     mqpub_topic_t *topic, *last;
 
     last = &mqpub_topics[MQTTSN_MAX_TOPICS-1];
-    for (topic = mqpub_topics; topic < last; topic++)
+    for (topic = mqpub_topics; topic <= last; topic++)
         _reset_topic(topic);
 }
 
@@ -120,7 +120,7 @@ static mqpub_topic_t *_alloc_topic(const char *topicstr) {
     mqpub_topic_t *topic, *last;
 
     last = &mqpub_topics[MQTTSN_MAX_TOPICS-1];
-    for (topic = mqpub_topics; topic < last; topic++)
+    for (topic = mqpub_topics; topic <= last; topic++)
         if (topic->name == NULL) {
             topic->name = topicstr;
             return topic;
@@ -132,9 +132,9 @@ static mqpub_topic_t *_lookup_topic(const char *topicstr) {
     mqpub_topic_t *topic, *last;
 
     last = &mqpub_topics[MQTTSN_MAX_TOPICS-1];
-    for (topic = mqpub_topics; topic < last; topic++)
+    for (topic = mqpub_topics; topic <= last; topic++)
         if (topic->name != NULL && 
-            strncmp(topic->name, topicstr, sizeof(topic->name)) == 0)
+            strcmp(topic->name, topicstr) == 0)
             return topic;
     return NULL;
 }
